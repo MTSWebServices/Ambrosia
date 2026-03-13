@@ -34,7 +34,7 @@ from ambrosia import types
 from ambrosia.preprocessing.aggregate import AggregatePreprocessor
 from ambrosia.preprocessing.cuped import Cuped, MultiCuped
 from ambrosia.preprocessing.robust import IQRPreprocessor, RobustPreprocessor
-from ambrosia.preprocessing.transformers import BoxCoxTransformer, LogTransformer
+from ambrosia.preprocessing.transformers import BoxCoxTransformer, LinearizationTransformer, LogTransformer
 
 
 class Preprocessor:
@@ -372,6 +372,50 @@ class Preprocessor:
         transformer = MultiCuped(verbose=self.verbose)
         if load_path is None:
             transformer.fit_transform(self.dataframe, target, by, transformed_name, inplace=True)
+        else:
+            transformer.load_params(load_path)
+            transformer.transform(self.dataframe, inplace=True)
+        self.transformers.append(transformer)
+        return self
+
+    def linearize(
+        self,
+        numerator: types.ColumnNameType,
+        denominator: types.ColumnNameType,
+        transformed_name: Optional[types.ColumnNameType] = None,
+        load_path: Optional[Path] = None,
+    ) -> Preprocessor:
+        """
+        Linearize a ratio metric for use in A/B testing.
+
+        Computes a per-unit linearized value that is approximately normally
+        distributed, enabling correct t-test usage for ratio metrics:
+
+            linearized_i = numerator_i - ratio * denominator_i
+
+        where ratio = mean(numerator) / mean(denominator) is estimated on
+        the data passed to this ``Preprocessor`` instance (reference / control data).
+
+        Parameters
+        ----------
+        numerator : ColumnNameType
+            Column name of the ratio numerator (e.g. ``"revenue"``).
+        denominator : ColumnNameType
+            Column name of the ratio denominator (e.g. ``"orders"``).
+        transformed_name : ColumnNameType, optional
+            Name for the new linearized column. Defaults to
+            ``"{numerator}_lin"``.
+        load_path : Path, optional
+            Path to a json file with pre-fitted parameters.
+
+        Returns
+        -------
+        self : Preprocessor
+            Instance object.
+        """
+        transformer = LinearizationTransformer()
+        if load_path is None:
+            transformer.fit_transform(self.dataframe, numerator, denominator, transformed_name, inplace=True)
         else:
             transformer.load_params(load_path)
             transformer.transform(self.dataframe, inplace=True)

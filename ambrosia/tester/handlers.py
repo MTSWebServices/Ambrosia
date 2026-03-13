@@ -51,7 +51,15 @@ class SparkCriteria(enum.Enum):
 
 class TheoreticalTesterHandler:
     def __init__(
-        self, group_a, group_b, column: str, alpha: np.ndarray, effect_type: str, criterion: StatCriterion, **kwargs
+        self,
+        group_a,
+        group_b,
+        column: str,
+        alpha: np.ndarray,
+        effect_type: str,
+        criterion: StatCriterion,
+        metric_func=None,
+        **kwargs,
     ):
         self.group_a = group_a
         self.group_b = group_b
@@ -59,6 +67,7 @@ class TheoreticalTesterHandler:
         self.alpha = alpha
         self.effect_type = effect_type
         self.criterion = criterion
+        self.metric_func = metric_func
         self.kwargs = kwargs
 
     def _correct_criterion(self, criterion: tp.Any) -> bool:
@@ -79,8 +88,12 @@ class TheoreticalTesterHandler:
 
     def _set_kwargs(self):
         if isinstance(self.group_a, pd.DataFrame):
-            self.group_a = self.group_a[self.column].values
-            self.group_b = self.group_b[self.column].values
+            if self.metric_func is not None:
+                self.group_a = np.asarray(self.metric_func(self.group_a))
+                self.group_b = np.asarray(self.metric_func(self.group_b))
+            else:
+                self.group_a = self.group_a[self.column].values
+                self.group_b = self.group_b[self.column].values
         elif isinstance(self.group_a, types.SparkDataFrame):
             self.kwargs["column"] = self.column
         self.kwargs["alpha"] = self.alpha

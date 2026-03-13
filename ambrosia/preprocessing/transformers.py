@@ -16,7 +16,7 @@
 Module contains tools for metrics transformations during a
 preprocessing task.
 """
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -386,3 +386,134 @@ class LogTransformer(AbstractFittableTransformer):
         transformed: pd.DataFrame = dataframe if inplace else dataframe.copy()
         transformed[self.column_names] = np.exp(transformed[self.column_names].values)
         return None if inplace else transformed
+
+
+class LinearizationTransformer(AbstractFittableTransformer):
+    """
+    Linearization transformer for ratio metrics.
+
+    Converts a ratio metric (numerator / denominator) into a per-unit linearized
+    metric that is approximately normally distributed, enabling correct t-test usage:
+
+        linearized_i = numerator_i - ratio * denominator_i
+
+    where ratio = mean(numerator) / mean(denominator), estimated on the reference
+    (control group / historical) data passed to fit().
+
+    Parameters
+    ----------
+    numerator : str
+        Column name of the ratio numerator (e.g. "revenue").
+    denominator : str
+        Column name of the ratio denominator (e.g. "orders").
+    transformed_name : str, optional
+        Name for the new column. Defaults to ``"{numerator}_lin"``.
+
+    Examples
+    --------
+    >>> transformer = LinearizationTransformer()
+    >>> transformer.fit(control_df, "revenue", "orders", "arpu_lin")
+    >>> transformer.transform(experiment_df, inplace=True)
+    """
+
+    def __str__(self) -> str:
+        return "Linearization transformation"
+
+    def __init__(self) -> None:
+        self.numerator: Optional[str] = None
+        self.denominator: Optional[str] = None
+        self.transformed_name: Optional[str] = None
+        self.ratio: Optional[float] = None
+        super().__init__()
+
+    def get_params_dict(self) -> Dict:
+        self._check_fitted()
+        return {
+            "numerator": self.numerator,
+            "denominator": self.denominator,
+            "transformed_name": self.transformed_name,
+            "ratio": self.ratio,
+        }
+
+    def load_params_dict(self, params: Dict) -> None:
+        for key in ("numerator", "denominator", "transformed_name", "ratio"):
+            if key not in params:
+                raise TypeError(f"params argument must contain: {key}")
+            setattr(self, key, params[key])
+        self.fitted = True
+
+    def fit(
+        self,
+        dataframe: pd.DataFrame,
+        numerator: str,
+        denominator: str,
+        transformed_name: Optional[str] = None,
+    ):
+        """
+        Estimate ratio = mean(numerator) / mean(denominator) on reference data.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            Reference dataframe (typically control group or historical data).
+        numerator : str
+            Column name of the ratio numerator.
+        denominator : str
+            Column name of the ratio denominator.
+        transformed_name : str, optional
+            Name for the linearized column. Defaults to ``"{numerator}_lin"``.
+        """
+        self._check_cols(dataframe, [numerator, denominator])
+        denom_mean = dataframe[denominator].mean()
+        if denom_mean == 0:
+            raise ValueError(f"Mean of denominator column '{denominator}' is zero; cannot compute ratio.")
+        self.numerator = numerator
+        self.denominator = denominator
+        self.transformed_name = transformed_name if transformed_name is not None else f"{numerator}_lin"
+        self.ratio = dataframe[numerator].mean() / denom_mean
+        self.fitted = True
+        return self
+
+    def transform(self, dataframe: pd.DataFrame, inplace: bool = False) -> Union[pd.DataFrame, None]:
+        """
+        Apply linearization: transformed = numerator - ratio * denominator.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            Dataframe to transform.
+        inplace : bool, default: ``False``
+            If ``True`` modifies dataframe in place, otherwise returns a copy.
+        """
+        self._check_fitted()
+        self._check_cols(dataframe, [self.numerator, self.denominator])
+        df = dataframe if inplace else dataframe.copy()
+        df[self.transformed_name] = df[self.numerator] - self.ratio * df[self.denominator]
+        return None if inplace else df
+
+    def fit_transform(
+        self,
+        dataframe: pd.DataFrame,
+        numerator: str,
+        denominator: str,
+        transformed_name: Optional[str] = None,
+        inplace: bool = False,
+    ) -> Union[pd.DataFrame, None]:
+        """
+        Fit and transform in one step.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            Reference dataframe for fitting and transformation.
+        numerator : str
+            Column name of the ratio numerator.
+        denominator : str
+            Column name of the ratio denominator.
+        transformed_name : str, optional
+            Name for the linearized column.
+        inplace : bool, default: ``False``
+            If ``True`` modifies dataframe in place.
+        """
+        self.fit(dataframe, numerator, denominator, transformed_name)
+        return self.transform(dataframe, inplace)
