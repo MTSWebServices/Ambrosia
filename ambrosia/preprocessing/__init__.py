@@ -21,7 +21,7 @@ from .cuped import Cuped, MultiCuped
 from .ml_var_reducer import MLVarianceReducer
 from .preprocessor import Preprocessor
 from .robust import IQRPreprocessor, RobustPreprocessor
-from .transformers import BoxCoxTransformer, LogTransformer
+from .transformers import BoxCoxTransformer, LinearizationTransformer, LogTransformer
 
 __all__ = [
     "AggregatePreprocessor",
@@ -32,5 +32,6 @@ __all__ = [
     "RobustPreprocessor",
     "IQRPreprocessor",
     "BoxCoxTransformer",
+    "LinearizationTransformer",
     "LogTransformer",
 ]
