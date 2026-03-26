@@ -31,4 +31,4 @@ jobs:
         run: poetry build
 
       - name: Publish
-        run: poetry publish -u __token__ -p ${{ secrets.PYPI_TOKEN }}
+        run: poetry publish -u __token__ -p ${{ secrets.PYPI_TOKEN_V2 }}

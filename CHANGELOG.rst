@@ -1,6 +1,35 @@
 Release Notes
 =============
 
+Version 0.5.1 (26.03.2026)
+---------------------------
+
+**New Features:**
+
+* Custom metric functions in ``Tester``: new ``metric_funcs`` parameter allows
+  passing arbitrary callables instead of column names. Works with ``theory``
+  and ``empiric`` methods. Functions passed to ``run()`` override those set
+  in the constructor.
+
+* ``LinearizationTransformer`` for ratio metrics (e.g. revenue/orders).
+  Linearizes metric via ``linearized_i = numerator_i - ratio * denominator_i``,
+  where ``ratio`` is estimated on reference data during ``fit()``.
+
+* ``Preprocessor.linearize()`` integrates linearization into the existing
+  chain architecture with full serialization and replay support.
+
+**Bug Fixes:**
+
+* Pinned ``setuptools>=65.0.0, <82.0.0`` to fix ``pkg_resources`` removal
+  in setuptools 82 that broke ``pip install ambrosia`` due to hyperopt dependency.
+
+**Internal:**
+
+* Updated publish workflow to use ``PYPI_TOKEN_V2``
+
+* Added CLAUDE.md to ``.gitignore``
+
+
 Version 0.5.0 (06.01.2025)
 ---------------------------
 
