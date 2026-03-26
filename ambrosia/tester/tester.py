@@ -29,7 +29,7 @@ development and will be available soon.
 """
 import itertools
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 from warnings import warn
 
 import numpy as np
@@ -88,6 +88,12 @@ class Tester(ABToolAbstract):
     metrics : MetricNameType, optional
         Metrics (columns of dataframe) which is used to calculate
         experiment result.
+    metric_funcs : Dict[str, Callable], optional
+        Dictionary mapping metric names to callable functions.
+        Each function receives a ``pd.DataFrame`` (group data) and must
+        return an array-like of numeric values. When provided, the
+        function is used instead of column lookup for the corresponding
+        metric name. Only supported for pandas DataFrames.
 
     Attributes
     ----------
@@ -241,6 +247,7 @@ class Tester(ABToolAbstract):
         id_column: Optional[types.ColumnNameType] = None,
         first_type_errors: types.StatErrorType = 0.05,
         metrics: Optional[types.MetricNamesType] = None,
+        metric_funcs: Optional[Dict[str, Callable]] = None,
     ):
         """
         Tester class constructor to initialize the object.
@@ -257,6 +264,7 @@ class Tester(ABToolAbstract):
             self.set_experiment_results(experiment_results=experiment_results)
         self.set_errors(first_type_errors)
         self.set_metrics(metrics)
+        self.__metric_funcs = metric_funcs or {}
 
     @staticmethod
     def __filter_data(
@@ -372,9 +380,15 @@ class Tester(ABToolAbstract):
         if method not in accepted_methods:
             raise ValueError(f'Choose method from {", ".join(accepted_methods)}')
         result: types.TesterResult = {}
+        metric_funcs: Dict = args.get("metric_funcs", {})
         for metric in args["metrics"]:
-            a_values: np.ndarray = args["data_a_group"][metric].values
-            b_values: np.ndarray = args["data_b_group"][metric].values
+            metric_func = metric_funcs.get(metric)
+            if metric_func is not None:
+                a_values: np.ndarray = np.asarray(metric_func(args["data_a_group"]))
+                b_values: np.ndarray = np.asarray(metric_func(args["data_b_group"]))
+            else:
+                a_values = args["data_a_group"][metric].values
+                b_values = args["data_b_group"][metric].values
             if method == "theory":
                 # TODO: Make it SolverClass ~ method
                 # solver = SolverClass(...)
@@ -386,6 +400,7 @@ class Tester(ABToolAbstract):
                     alpha=np.array(args["alpha"]),
                     effect_type=args["effect_type"],
                     criterion=args["criterion"],
+                    metric_func=metric_func,
                     **kwargs,
                 )
                 sub_result = solver.solve()
@@ -473,6 +488,7 @@ class Tester(ABToolAbstract):
         criterion: Optional[ABStatCriterion] = None,
         correction_method: Union[str, None] = "bonferroni",
         as_table: bool = True,
+        metric_funcs: Optional[Dict[str, Callable]] = None,
         **kwargs,
     ) -> types.TesterResult:
         """
@@ -515,6 +531,11 @@ class Tester(ABToolAbstract):
         as_table : bool, default: ``True``
             Return the test results as a pandas dataframe.
             If ``False``, a list of dicts with results will be returned.
+        metric_funcs : Dict[str, Callable], optional
+            Dictionary mapping metric names to callable functions.
+            Each function receives a group ``pd.DataFrame`` and returns
+            array-like values. Overrides functions set in constructor
+            for matching metric names. Only pandas DataFrames supported.
         **kwargs : Dict
             Other keyword arguments.
 
@@ -556,6 +577,8 @@ class Tester(ABToolAbstract):
         chosen_args: types._UsageArgumentsType = Tester._prepare_arguments(arguments_choice)
         chosen_args["effect_type"] = effect_type
         chosen_args["criterion"] = criterion
+        effective_metric_funcs = {**self.__metric_funcs, **(metric_funcs or {})}
+        chosen_args["metric_funcs"] = effective_metric_funcs
 
         hypothesis_num: int = len(list(itertools.combinations(chosen_args["experiment_results"], 2))) * len(
             chosen_args["metrics"]
@@ -602,6 +625,7 @@ def test(
     criterion: Optional[ABStatCriterion] = None,
     correction_method: Union[str, None] = "bonferroni",
     as_table: bool = True,
+    metric_funcs: Optional[Dict[str, Callable]] = None,
     **kwargs,
 ) -> types.TesterResult:
     """
@@ -649,6 +673,10 @@ def test(
     as_table : bool, default: ``True``
         Return the test results as a pandas dataframe.
         If ``False``, a list of dicts with results will be returned.
+    metric_funcs : Dict[str, Callable], optional
+        Dictionary mapping metric names to callable functions.
+        Each function receives a group ``pd.DataFrame`` and returns
+        array-like values. Only pandas DataFrames supported.
     **kwargs : Dict
         Other keyword arguments.
 
@@ -673,5 +701,6 @@ def test(
         criterion=criterion,
         correction_method=correction_method,
         as_table=as_table,
+        metric_funcs=metric_funcs,
         **kwargs,
     )

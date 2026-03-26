@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -117,3 +118,71 @@ def test_store_load_config(data_for_agg):
     transformed_by_config: pd.DataFrame = loaded_preprocessor.apply_transformations()
     os.remove(store_path)
     assert (transformed == transformed_by_config).all(None)
+
+
+@pytest.mark.smoke()
+def test_linearize_basic(data_nonlin_var):
+    """
+    Test that linearize creates new column and returns self.
+    """
+    preprocessor = Preprocessor(data_nonlin_var, verbose=False)
+    result = preprocessor.linearize("target", "feature_1", transformed_name="target_lin")
+    assert result is preprocessor  # method chaining
+    assert "target_lin" in preprocessor.data().columns
+
+
+@pytest.mark.unit()
+def test_linearize_formula(data_nonlin_var):
+    """
+    Test that linearized values satisfy: linearized = num - ratio * denom.
+    """
+    preprocessor = Preprocessor(data_nonlin_var, verbose=False)
+    preprocessor.linearize("target", "feature_1", transformed_name="target_lin")
+    df = preprocessor.data()
+    transformer = preprocessor.transformations()[-1]
+    ratio = transformer.ratio
+    expected = data_nonlin_var["target"] - ratio * data_nonlin_var["feature_1"]
+    np.testing.assert_allclose(df["target_lin"].values, expected.values, rtol=1e-10)
+
+
+@pytest.mark.unit()
+def test_linearize_in_chain(data_nonlin_var):
+    """
+    Test linearize as part of a preprocessing chain.
+    """
+    preprocessor = Preprocessor(data_nonlin_var, verbose=False)
+    result = (
+        preprocessor.robust("feature_1", alpha=0.01)
+        .linearize("target", "feature_1", transformed_name="target_lin")
+        .data()
+    )
+    assert "target_lin" in result.columns
+
+
+@pytest.mark.unit()
+def test_linearize_load_store(data_nonlin_var):
+    """
+    Test that linearization transformer can be serialized and replayed.
+    """
+    store_path = "tests/configs/linearize_config.json"
+    preprocessor = Preprocessor(data_nonlin_var, verbose=False)
+    preprocessor.linearize("target", "feature_1", transformed_name="target_lin")
+    preprocessor.store_transformations(store_path)
+
+    loaded_preprocessor = Preprocessor(data_nonlin_var, verbose=False)
+    loaded_preprocessor.load_transformations(store_path)
+
+    os.remove(store_path)
+
+    for t, lt in zip(preprocessor.transformations(), loaded_preprocessor.transformations()):
+        assert t.get_params_dict() == lt.get_params_dict()
+
+
+@pytest.mark.unit()
+def test_linearize_default_name(data_nonlin_var):
+    """
+    Test that default transformed_name is '{numerator}_lin'.
+    """
+    preprocessor = Preprocessor(data_nonlin_var, verbose=False)
+    preprocessor.linearize("target", "feature_1")
+    assert "target_lin" in preprocessor.data().columns

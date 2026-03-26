@@ -384,3 +384,80 @@ def test_paired_bootstrap(effect_type, alternative):
     )
     assert test_results_dep[0]["pvalue"] < test_results_ind[0]["pvalue"]
     assert test_results_dep[0]["confidence_interval"][0] > test_results_ind[0]["confidence_interval"][0]
+
+
+@pytest.mark.unit
+def test_metric_func_constructor(results_ltv_retention_conversions):
+    """
+    Test that metric_funcs passed to constructor are used when metric name matches.
+    """
+    # ratio metric: ltv / retention (arbitrary, just to test callable path)
+    ratio_func = lambda df: (df["ltv"] / (df["retention"] + 1e-6)).values
+    tester = Tester(
+        dataframe=results_ltv_retention_conversions,
+        column_groups="group",
+        metrics=["ratio_metric"],
+        metric_funcs={"ratio_metric": ratio_func},
+    )
+    result = tester.run(as_table=False)
+    assert len(result) == 1
+    assert "pvalue" in result[0]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("method", ["theory", "empiric"])
+def test_metric_func_run(method, results_ltv_retention_conversions):
+    """
+    Test that metric_funcs passed to run() work for theory and empiric methods.
+    """
+    double_ltv = lambda df: (df["ltv"] * 2).values
+    tester = Tester(
+        dataframe=results_ltv_retention_conversions,
+        column_groups="group",
+        metrics=["ltv"],
+    )
+    result_normal = tester.run(method=method, metrics=["ltv"], as_table=False)
+    result_func = tester.run(
+        method=method,
+        metrics=["custom"],
+        metric_funcs={"custom": double_ltv},
+        as_table=False,
+    )
+    # Doubling values doesn't change pvalue for ttest (same scale), but effect should be doubled
+    assert abs(result_func[0]["effect"]) == pytest.approx(abs(result_normal[0]["effect"]) * 2, rel=1e-4)
+
+
+@pytest.mark.unit
+def test_metric_func_overrides_constructor(results_ltv_retention_conversions):
+    """
+    Test that metric_funcs in run() override those set in constructor.
+    """
+    func_a = lambda df: df["ltv"].values
+    func_b = lambda df: (df["ltv"] * 3).values
+    tester = Tester(
+        dataframe=results_ltv_retention_conversions,
+        column_groups="group",
+        metric_funcs={"my_metric": func_a},
+    )
+    result_a = tester.run(metrics=["my_metric"], as_table=False)
+    result_b = tester.run(metrics=["my_metric"], metric_funcs={"my_metric": func_b}, as_table=False)
+    assert abs(result_b[0]["effect"]) == pytest.approx(abs(result_a[0]["effect"]) * 3, rel=1e-4)
+
+
+@pytest.mark.unit
+def test_metric_func_bootstrap(results_ltv_retention_conversions):
+    """
+    Test that metric_funcs work with empiric (bootstrap) method.
+    """
+    double_ltv = lambda df: (df["ltv"] * 2).values
+    tester = Tester(
+        dataframe=results_ltv_retention_conversions,
+        column_groups="group",
+        metrics=["custom"],
+        metric_funcs={"custom": double_ltv},
+    )
+    result = tester.run(method="empiric", as_table=False)
+    assert len(result) == 1
+    assert "pvalue" in result[0]
+    assert "effect" in result[0]
+    assert "confidence_interval" in result[0]
