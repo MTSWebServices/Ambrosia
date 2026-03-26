@@ -442,3 +442,22 @@ def test_metric_func_overrides_constructor(results_ltv_retention_conversions):
     result_a = tester.run(metrics=["my_metric"], as_table=False)
     result_b = tester.run(metrics=["my_metric"], metric_funcs={"my_metric": func_b}, as_table=False)
     assert abs(result_b[0]["effect"]) == pytest.approx(abs(result_a[0]["effect"]) * 3, rel=1e-4)
+
+
+@pytest.mark.unit
+def test_metric_func_bootstrap(results_ltv_retention_conversions):
+    """
+    Test that metric_funcs work with empiric (bootstrap) method.
+    """
+    double_ltv = lambda df: (df["ltv"] * 2).values
+    tester = Tester(
+        dataframe=results_ltv_retention_conversions,
+        column_groups="group",
+        metrics=["custom"],
+        metric_funcs={"custom": double_ltv},
+    )
+    result = tester.run(method="empiric", as_table=False)
+    assert len(result) == 1
+    assert "pvalue" in result[0]
+    assert "effect" in result[0]
+    assert "confidence_interval" in result[0]

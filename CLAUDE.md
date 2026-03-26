@@ -1,88 +1,85 @@
 # Ambrosia
 
-A/B testing framework for experiment design, group splitting, and results evaluation.
-Supports both pandas and Spark DataFrames.
+Python-библиотека для A/B-тестирования: дизайн экспериментов, разбиение на группы, оценка эффекта. Поддержка pandas и PySpark.
 
-## Commands
+## Команды
 
 ```bash
-make install      # create .venv via Poetry (poetry install --all-extras)
-make test         # run pytest with coverage
-make lint         # isort + black + pylint + flake8 (checks only)
-make autoformat   # isort + black (fix in place)
-make clean        # remove .venv, build artifacts, reports/
+# Установка
+make install                  # poetry install + extras
+
+# Тесты
+make test                     # pytest
+poetry run pytest tests/ -x   # с остановкой на первом падении
+poetry run pytest tests/test_designer.py -x  # конкретный файл
+
+# Линтеры (проверка)
+make lint                     # isort + black + pylint + flake8
+
+# Форматирование (авто-исправление)
+make autoformat               # isort + black
+
+# Coverage
+make coverage
 ```
 
-Single test: `PYTHONPATH=. pytest tests/path/test_file.py::test_fn`
+## Архитектура
 
-Line length: **120**.
+Три основных модуля образуют пайплайн:
+- `ambrosia/designer/` — расчёт параметров эксперимента (размер выборки, MDE, мощность)
+- `ambrosia/splitter/` — разбиение пользователей на группы (simple, hash, metric, stratification)
+- `ambrosia/tester/` — оценка эффекта и статзначимости (t-test, Mann-Whitney, Wilcoxon, bootstrap)
 
-## Architecture
+Предобработка:
+- `ambrosia/preprocessing/` — агрегация, outlier removal, Box-Cox, Log, CUPED, ML variance reduction
 
-### Three-stage pipeline
+Ядро:
+- `ambrosia/tools/` — абстрактные классы, стат. критерии, KNN, утилиты
+- `ambrosia/spark_tools/` — PySpark-реализации (опциональная зависимость)
 
-`Designer` → `Splitter` → `Tester` are independent, stateless-ish classes.
-No shared state between stages; each takes a DataFrame and parameters.
+### Иерархия абстракций
 
-### Pandas/Spark dispatch
-
-Never subclass for pandas vs. Spark. Instead use `DataframeHandler` or the
-free function `choose_on_table(alternatives, dataframe)` in
-`ambrosia/tools/ab_abstract_component.py`:
-
-```python
-choose_on_table([pandas_func, spark_func], dataframe)
+```
+ABToolAbstract          — базовый класс для Designer, Splitter, Tester
+AbstractFittableTransformer — базовый для трансформеров (BoxCox, Log, Robust, IQR, Aggregate, Cuped)
+AbstractVarianceReducer     — базовый для Cuped, MultiCuped, MLVarianceReducer
+ABStatCriterion             — базовый для TtestIndCriterion, MannWhitneyCriterion и др.
 ```
 
-`DataframeHandler._handle_cases` / `_handle_on_table` wrap this pattern for
-method dispatch in handlers (e.g. `TheoryHandler`, `EmpiricHandler`).
+Каждый основной класс (Designer, Splitter, Tester) реализует паттерн:
+- Конфигурация через `set_*()` методы или конструктор
+- Запуск через `run()` метод
+- Поддержка YAML-сериализации
 
-### ABMetaClass
+## Код-стайл
 
-`ABMetaClass(ABCMeta, YAMLObjectMetaclass)` in `ab_abstract_component.py`
-resolves the metaclass conflict between `ABCMeta` and PyYAML's
-`YAMLObjectMetaclass`. Any class that inherits from `ABToolAbstract` **and**
-needs YAML serialization must set `metaclass=ABMetaClass`.
+- **Line length:** 120 символов (black, isort, flake8 — всё настроено на 120)
+- **Formatter:** black
+- **Import sort:** isort (trailing comma, parentheses, case-sensitive)
+- **Docstrings:** NumPy convention
+- **Лицензионный заголовок** в каждом .py файле:
+  ```python
+  #  Copyright 2022 MTS (Mobile Telesystems)
+  #
+  #  Licensed under the Apache License, Version 2.0 (the "License");
+  #  ...
+  ```
+- **Type hints:** используются через `ambrosia/types.py` — единый модуль типов
+- **Flake8 игнорирует:** D200, D205, D400, D105, D100, E203, W503
+- **Pylint:** конфигурация в `.pylintrc`, игнорирует `tests/`
 
-### ABToolAbstract._prepare_arguments()
+## Тестирование
 
-Constructor args are "saved" defaults; `run()` args can override them at
-call time. `_prepare_arguments` resolves the priority:
-run-time arg → constructor arg → `ValueError` if both are None.
+- Фреймворк: pytest
+- Маркеры: `@pytest.mark.unit`, `@pytest.mark.smoke`
+- Фикстуры: `tests/conftest.py` (включая local Spark session)
+- Тестовые данные: `tests/test_data/`
+- Паттерн именования: `test_*.py`, функции `test_*`
 
-```python
-chosen = _prepare_arguments({"alpha": [self._alpha, given_alpha]})
-```
+## Важные соглашения
 
-### Stat criteria strategy pattern
-
-Hierarchy: `StatCriterion` (abstract, just `calculate_pvalue`) →
-`ABStatCriterion` (adds `calculate_effect`, `calculate_conf_interval`,
-`get_results`).
-
-Concrete implementations in `ambrosia/tools/stat_criteria.py`:
-`TtestIndCriterion`, `TtestRelCriterion`, `MannWhitneyCriterion`,
-`WilcoxonCriterion`.
-
-`Tester` dispatches by string alias via `AVAILABLE_AB_CRITERIA` dict — duck
-typing, not isinstance checks. To add a criterion: subclass `ABStatCriterion`,
-set `alias` and `implemented_effect_types` class attributes, register in the
-dict.
-
-### Preprocessor chain
-
-`Preprocessor` (pandas only) uses method chaining — each method returns
-`self`. Each step appends a fitted `AbstractFittableTransformer` to
-`self.transformers`. The transformer list supports serialization
-(`store_transformations` / `load_transformations` → JSON) and replay
-(`apply_transformations`) for consistent train/test preprocessing.
-
-### Theoretical vs empirical design
-
-Two design philosophies plug into the same `SimpleDesigner` interface:
-
-- **Theoretical** (`TheoryHandler`): closed-form power/sample-size formulas
-- **Empirical** (`EmpiricHandler`): bootstrap/simulation-based estimates
-
-Both implement `size_design`, `effect_design`, `power_design` and dispatch
-pandas vs. Spark internally via `DataframeHandler`.
+- PySpark — опциональная зависимость (`pip install ambrosia[spark]`). Импорт Spark-модулей защищён через `ambrosia/tools/import_tools.py`
+- KNN использует nmslib (primary) с fallback на hnswlib (для macOS ARM)
+- Python 3.9–3.13, PySpark >= 3.4
+- Управление зависимостями: Poetry (pyproject.toml)
+- CI: GitHub Actions (lint + test matrix по версиям Python)

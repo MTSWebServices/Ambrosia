@@ -88,6 +88,12 @@ class Tester(ABToolAbstract):
     metrics : MetricNameType, optional
         Metrics (columns of dataframe) which is used to calculate
         experiment result.
+    metric_funcs : Dict[str, Callable], optional
+        Dictionary mapping metric names to callable functions.
+        Each function receives a ``pd.DataFrame`` (group data) and must
+        return an array-like of numeric values. When provided, the
+        function is used instead of column lookup for the corresponding
+        metric name. Only supported for pandas DataFrames.
 
     Attributes
     ----------
@@ -525,6 +531,11 @@ class Tester(ABToolAbstract):
         as_table : bool, default: ``True``
             Return the test results as a pandas dataframe.
             If ``False``, a list of dicts with results will be returned.
+        metric_funcs : Dict[str, Callable], optional
+            Dictionary mapping metric names to callable functions.
+            Each function receives a group ``pd.DataFrame`` and returns
+            array-like values. Overrides functions set in constructor
+            for matching metric names. Only pandas DataFrames supported.
         **kwargs : Dict
             Other keyword arguments.
 
@@ -662,6 +673,10 @@ def test(
     as_table : bool, default: ``True``
         Return the test results as a pandas dataframe.
         If ``False``, a list of dicts with results will be returned.
+    metric_funcs : Dict[str, Callable], optional
+        Dictionary mapping metric names to callable functions.
+        Each function receives a group ``pd.DataFrame`` and returns
+        array-like values. Only pandas DataFrames supported.
     **kwargs : Dict
         Other keyword arguments.
 
