@@ -17,7 +17,7 @@ Ambrosia
     :target: https://codecov.io/gh/MobileTeleSystems/Ambrosia
 .. |Black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
     :target: https://github.com/psf/black
-.. |Python Versions| image:: https://img.shields.io/pypi/pyversions/ambrosia.svg
+.. |Python Versions| image:: https://img.shields.io/pypi/pyversions/ambrosia.svg?v=0.5.0
     :target: https://pypi.org/project/ambrosia  
 .. |Telegram Channel| image:: https://img.shields.io/badge/telegram-Ambrosia-blueviolet.svg?logo=telegram
     :target: https://t.me/+Tkt43TNUUSAxNWNi
@@ -61,6 +61,8 @@ and `Tutorials <https://github.com/MobileTeleSystems/Ambrosia/tree/main/examples
 
 Installation
 ------------
+
+**Requirements:** Python 3.9+
 
 You can always get the newest *Ambrosia* release using ``pip``.
 Stable version is released on every tag to ``main`` branch. 
