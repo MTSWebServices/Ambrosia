@@ -5,7 +5,7 @@ Ambrosia
 
 |PyPI| |PyPI License| |ReadTheDocs| |Tests| |Coverage| |Black| |Python Versions| |Telegram Channel|
 
-.. |PyPI| image:: https://img.shields.io/pypi/v/ambrosia
+.. |PyPI| image:: https://img.shields.io/pypi/v/ambrosia?v=0.5.1
     :target: https://pypi.org/project/ambrosia
 .. |PyPI License| image:: https://img.shields.io/pypi/l/ambrosia.svg
     :target: https://github.com/MobileTeleSystems/Ambrosia/blob/main/LICENSE
