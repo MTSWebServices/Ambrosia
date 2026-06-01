@@ -6,19 +6,26 @@ Version 0.5.2 (unreleased)
 
 **New Features:**
 
-* Additional multiple hypothesis testing corrections in ``Tester``. The
-  ``correction_method`` parameter now accepts ``"sidak"``, ``"holm"``,
-  ``"holm-sidak"``, ``"fdr_bh"`` (Benjamini-Hochberg), ``"fdr_by"``
-  (Benjamini-Yekutieli), ``"hommel"`` and ``"simes-hochberg"`` in addition to
-  the default ``"bonferroni"`` (pass ``None`` to disable). The Benjamini-Hochberg
-  and Benjamini-Yekutieli procedures control the false discovery rate, while the
-  step-wise family-wise procedures (Holm, Holm-Sidak, Hommel, Hochberg) are more
-  powerful than Bonferroni - Holm uniformly so, with Hommel and Hochberg more
-  powerful still under independence or positive dependence. For ``"bonferroni"``
-  and ``"sidak"`` confidence
-  intervals are widened accordingly; the step-wise methods adjust only the
-  p-values and leave intervals at the nominal level. Common aliases such as
-  ``"benjamini-hochberg"`` are also accepted.
+* The ``Tester`` now offers several ways to correct p-values when an experiment
+  evaluates many metrics or many groups at once, not just Bonferroni. Running a
+  lot of comparisons together inflates the chance of a false positive, and a
+  correction keeps that chance under control. The ``correction_method`` argument
+  now accepts:
+
+  * ``"bonferroni"`` (the default, unchanged), ``"holm"``, ``"holm-sidak"``,
+    ``"sidak"``, ``"hommel"`` and ``"simes-hochberg"`` - methods that limit the
+    probability of making *any* false positive. ``"holm"`` and the others are
+    less conservative than Bonferroni, so you keep more statistical power.
+  * ``"fdr_bh"`` (Benjamini-Hochberg) and ``"fdr_by"`` (Benjamini-Yekutieli) -
+    methods that control the false discovery rate, i.e. the expected share of
+    false positives among the metrics you call significant. A popular choice
+    when a dashboard tracks many metrics.
+
+  Existing code keeps working unchanged: Bonferroni stays the default and
+  ``correction_method=None`` turns correction off. Friendly aliases such as
+  ``"benjamini-hochberg"`` are also accepted. For ``"bonferroni"`` and
+  ``"sidak"`` the confidence intervals are widened to match; the other methods
+  adjust the p-values only.
 
 **Internal:**
 
