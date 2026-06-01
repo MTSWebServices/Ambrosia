@@ -13,4 +13,4 @@ Pandas Data Examples
     /pandas_examples/06_pandas_tester
     /pandas_examples/10_synthetic_experiment_full_pipeline_short
     /pandas_examples/11_cuped_example
-    
+    /pandas_examples/13_multiple_testing_corrections

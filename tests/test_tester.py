@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from ambrosia.tester import Tester, test
+from ambrosia.tools import multitest as mt
 from ambrosia.tools.stat_criteria import TtestIndCriterion, TtestRelCriterion
 
 
@@ -461,3 +462,367 @@ def test_metric_func_bootstrap(results_ltv_retention_conversions):
     assert "pvalue" in result[0]
     assert "effect" in result[0]
     assert "confidence_interval" in result[0]
+
+
+def _two_group_frame() -> pd.DataFrame:
+    """
+    Deterministic two-group, two-metric frame with UNEQUAL within-group variances.
+
+    The unequal spread makes the pinned p-values specific to the Welch t-test
+    (the default criterion); they would change if the variance handling regressed
+    to a pooled/Student t-test.
+    """
+    return pd.DataFrame(
+        {
+            "group": ["A"] * 10 + ["B"] * 10,
+            "m1": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] + [2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
+            "m2": [5, 5, 5, 5, 5, 6, 6, 6, 6, 6] + [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        }
+    )
+
+
+def _three_group_frame() -> pd.DataFrame:
+    """
+    Deterministic three-group, one-metric frame. The family size becomes
+    m = C(3, 2) * 1 = 3, exercising both the pair enumeration and the p-value
+    clip-at-1 boundary (the A-vs-B pair has raw p * 3 > 1).
+    """
+    return pd.DataFrame(
+        {
+            "group": ["A"] * 10 + ["B"] * 10 + ["C"] * 10,
+            "x": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+            + [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+            + [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+        }
+    )
+
+
+@pytest.mark.unit
+def test_bonferroni_backward_compat_characterization():
+    """
+    Lock the EXACT current Bonferroni output (absolute effect) before the multitest
+    refactor. With two metrics and two groups the family size is m = C(2, 2) * 2 = 2:
+    p-values are multiplied by 2 (clipped at 1), confidence intervals are built at
+    alpha / 2, and the reported first type error is restored to the nominal level.
+    The default ``correction_method`` is ``"bonferroni"``, so default == explicit.
+    Backward-compatibility guard: must keep passing unchanged after the refactor.
+    """
+    tester = Tester(
+        dataframe=_two_group_frame(),
+        column_groups="group",
+        metrics=["m1", "m2"],
+        first_type_errors=0.05,
+    )
+    res_bonf = tester.run("absolute", method="theory", correction_method="bonferroni", as_table=False)
+    res_none = tester.run("absolute", method="theory", correction_method=None, as_table=False)
+    res_default = tester.run("absolute", method="theory", as_table=False)
+    bonf = {r["metric name"]: r for r in res_bonf}
+    none = {r["metric name"]: r for r in res_none}
+    default = {r["metric name"]: r for r in res_default}
+
+    # Exact uncorrected Welch p-values (differ from Student's t for this frame).
+    assert none["m1"]["pvalue"] == pytest.approx(0.0230712838, abs=1e-9)
+    assert none["m2"]["pvalue"] == pytest.approx(0.0679387323, abs=1e-9)
+    # Exact Bonferroni-corrected p-values.
+    assert bonf["m1"]["pvalue"] == pytest.approx(0.0461425675, abs=1e-9)
+    assert bonf["m2"]["pvalue"] == pytest.approx(0.1358774645, abs=1e-9)
+
+    for metric in ["m1", "m2"]:
+        # The default correction_method is "bonferroni": default == explicit.
+        assert default[metric]["pvalue"] == pytest.approx(bonf[metric]["pvalue"], abs=1e-12)
+        # Bonferroni p-value == min(raw * m, 1).
+        assert bonf[metric]["pvalue"] == pytest.approx(min(none[metric]["pvalue"] * 2, 1.0), abs=1e-12)
+        # Reported first type error is restored to the nominal level.
+        assert float(np.ravel(bonf[metric]["first_type_error"])[0]) == pytest.approx(0.05)
+        # Corrected confidence interval is strictly wider (built at alpha / m).
+        assert bonf[metric]["confidence_interval"][0] < none[metric]["confidence_interval"][0]
+        assert bonf[metric]["confidence_interval"][1] > none[metric]["confidence_interval"][1]
+
+
+@pytest.mark.unit
+def test_bonferroni_characterization_as_table():
+    """
+    Lock the ``as_table=True`` output (the primary path; the list-of-dicts output is
+    derived from it): the column set and the restored nominal first_type_error column.
+    """
+    tester = Tester(
+        dataframe=_two_group_frame(),
+        column_groups="group",
+        metrics=["m1", "m2"],
+        first_type_errors=0.05,
+    )
+    table = tester.run("absolute", method="theory", correction_method="bonferroni", as_table=True)
+    assert isinstance(table, pd.DataFrame)
+    assert list(table.columns) == [
+        "first_type_error",
+        "pvalue",
+        "effect",
+        "confidence_interval",
+        "metric name",
+        "group A label",
+        "group B label",
+    ]
+    assert list(table["first_type_error"]) == [0.05, 0.05]
+    pvals = dict(zip(table["metric name"], table["pvalue"]))
+    assert pvals["m1"] == pytest.approx(0.0461425675, abs=1e-9)
+    assert pvals["m2"] == pytest.approx(0.1358774645, abs=1e-9)
+
+
+@pytest.mark.unit
+def test_bonferroni_characterization_relative():
+    """
+    Lock current Bonferroni behavior for the relative effect type (delta-method
+    p-value path). Family size m = 2, so p-values double (clipped at 1).
+    """
+    tester = Tester(
+        dataframe=_two_group_frame(),
+        column_groups="group",
+        metrics=["m1", "m2"],
+        first_type_errors=0.05,
+    )
+    none = {r["metric name"]: r for r in tester.run("relative", "theory", correction_method=None, as_table=False)}
+    bonf = {
+        r["metric name"]: r for r in tester.run("relative", "theory", correction_method="bonferroni", as_table=False)
+    }
+    assert none["m1"]["pvalue"] == pytest.approx(0.0239676798, abs=1e-9)
+    assert none["m2"]["pvalue"] == pytest.approx(0.0316317147, abs=1e-9)
+    for metric in ["m1", "m2"]:
+        assert bonf[metric]["pvalue"] == pytest.approx(min(none[metric]["pvalue"] * 2, 1.0), abs=1e-12)
+
+
+@pytest.mark.unit
+def test_bonferroni_three_groups_clip_characterization():
+    """
+    Three groups, one metric => m = C(3, 2) = 3 hypotheses. Locks the pair
+    enumeration, the exact 3x scaling for non-clipping pairs, and the clip-at-1
+    boundary (the A-vs-B pair has raw p * 3 > 1).
+    """
+    tester = Tester(
+        dataframe=_three_group_frame(),
+        column_groups="group",
+        metrics=["x"],
+        first_type_errors=0.05,
+    )
+    none = tester.run("absolute", "theory", correction_method=None, as_table=False)
+    bonf = tester.run("absolute", "theory", correction_method="bonferroni", as_table=False)
+    assert len(none) == 3 and len(bonf) == 3
+    none_by = {(r["group A label"], r["group B label"]): r["pvalue"] for r in none}
+    bonf_by = {(r["group A label"], r["group B label"]): r["pvalue"] for r in bonf}
+    assert set(none_by) == {("A", "B"), ("A", "C"), ("B", "C")}
+    # Each corrected p-value equals min(raw * 3, 1).
+    for pair, raw_p in none_by.items():
+        assert bonf_by[pair] == pytest.approx(min(raw_p * 3, 1.0), abs=1e-12)
+    # A-vs-B clips to 1.0; the well-separated pairs do not.
+    assert bonf_by[("A", "B")] == pytest.approx(1.0, abs=1e-12)
+    assert bonf_by[("A", "C")] < 1.0
+    assert bonf_by[("B", "C")] < 1.0
+
+
+@pytest.mark.unit
+def test_single_metric_no_correction_characterization():
+    """
+    With a single hypothesis (one metric, two groups) no correction is applied,
+    so Bonferroni, the default and ``None`` must all yield identical p-values.
+    """
+    tester = Tester(dataframe=_two_group_frame(), column_groups="group", metrics=["m1"], first_type_errors=0.05)
+    p_bonf = tester.run("absolute", method="theory", correction_method="bonferroni", as_table=False)[0]["pvalue"]
+    p_none = tester.run("absolute", method="theory", correction_method=None, as_table=False)[0]["pvalue"]
+    assert p_bonf == pytest.approx(p_none, abs=1e-12)
+    assert p_none == pytest.approx(0.0230712838, abs=1e-9)
+
+
+NEW_CORRECTION_METHODS = ["sidak", "holm", "holm-sidak", "fdr_bh", "fdr_by", "hommel", "simes-hochberg"]
+ALL_CORRECTION_METHODS = ["bonferroni"] + NEW_CORRECTION_METHODS
+
+
+def _three_group_two_metric_frame() -> pd.DataFrame:
+    """
+    Deterministic three-group, two-metric frame (family size m = C(3, 2) * 2 = 6)
+    with a spread of effect sizes, so the corrected p-values vary across methods.
+    """
+    rng = np.random.default_rng(2024)
+    n = 150
+    return pd.DataFrame(
+        {
+            "group": ["A"] * n + ["B"] * n + ["C"] * n,
+            "x": np.r_[rng.normal(0.0, 1.0, n), rng.normal(0.3, 1.0, n), rng.normal(0.15, 1.0, n)],
+            "y": np.r_[rng.normal(10.0, 3.0, n), rng.normal(10.4, 3.0, n), rng.normal(9.7, 3.0, n)],
+        }
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("effect_type", ["absolute", "relative"])
+@pytest.mark.parametrize("method", ALL_CORRECTION_METHODS)
+def test_correction_method_wires_multitest(method, effect_type):
+    """
+    The Tester applies the multitest module to the family of raw p-values:
+    corrected p-values match the module output, the reported first type error
+    stays nominal, and only the constant-scaling methods (Bonferroni, Sidak)
+    widen the confidence intervals while step-wise methods leave them nominal.
+    """
+    tester = Tester(
+        dataframe=_three_group_two_metric_frame(),
+        column_groups="group",
+        metrics=["x", "y"],
+        first_type_errors=0.05,
+    )
+    raw = tester.run(effect_type, method="theory", correction_method=None, as_table=True)
+    corrected = tester.run(effect_type, method="theory", correction_method=method, as_table=True)
+    np.testing.assert_allclose(corrected["pvalue"].values, mt.adjust_pvalues(raw["pvalue"].values, method), atol=1e-12)
+    np.testing.assert_allclose(corrected["first_type_error"].values, raw["first_type_error"].values)
+    if mt.is_ci_correctable(method):
+        assert list(corrected["confidence_interval"]) != list(raw["confidence_interval"])
+    else:
+        assert list(corrected["confidence_interval"]) == list(raw["confidence_interval"])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("method", ALL_CORRECTION_METHODS)
+def test_correction_is_more_conservative_than_raw(method):
+    """
+    Every supported correction yields p-values no smaller than the uncorrected ones.
+    """
+    tester = Tester(
+        dataframe=_three_group_two_metric_frame(),
+        column_groups="group",
+        metrics=["x", "y"],
+        first_type_errors=0.05,
+    )
+    raw = tester.run("absolute", method="theory", correction_method=None, as_table=True)["pvalue"].values
+    corrected = tester.run("absolute", method="theory", correction_method=method, as_table=True)["pvalue"].values
+    assert np.all(corrected >= raw - 1e-12)
+
+
+@pytest.mark.unit
+def test_correction_relative_ordering():
+    """
+    At the Tester level: raw <= Holm <= Bonferroni and Benjamini-Hochberg <= Holm
+    (results across runs share the same row order, so they compare element-wise).
+    """
+    tester = Tester(
+        dataframe=_three_group_two_metric_frame(),
+        column_groups="group",
+        metrics=["x", "y"],
+        first_type_errors=0.05,
+    )
+
+    def pvalues(correction):
+        return tester.run("absolute", method="theory", correction_method=correction, as_table=True)["pvalue"].values
+
+    raw, bonf, holm, bh = pvalues(None), pvalues("bonferroni"), pvalues("holm"), pvalues("fdr_bh")
+    tol = 1e-12
+    assert np.all(raw <= holm + tol)
+    assert np.all(holm <= bonf + tol)
+    assert np.all(bh <= holm + tol)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("method", NEW_CORRECTION_METHODS)
+def test_single_hypothesis_correction_is_noop(method):
+    """
+    With a single hypothesis every method equals the uncorrected result.
+    """
+    tester = Tester(dataframe=_two_group_frame(), column_groups="group", metrics=["m1"], first_type_errors=0.05)
+    p_none = tester.run("absolute", method="theory", correction_method=None, as_table=False)[0]["pvalue"]
+    p_corr = tester.run("absolute", method="theory", correction_method=method, as_table=False)[0]["pvalue"]
+    assert p_corr == pytest.approx(p_none, abs=1e-12)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("method", ["holm", "fdr_bh"])
+def test_correction_as_table_matches_records(method):
+    """
+    The as_table=True and as_table=False outputs carry the same corrected p-values.
+    """
+    tester = Tester(
+        dataframe=_three_group_two_metric_frame(),
+        column_groups="group",
+        metrics=["x", "y"],
+        first_type_errors=0.05,
+    )
+    table = tester.run("absolute", method="theory", correction_method=method, as_table=True)
+    records = tester.run("absolute", method="theory", correction_method=method, as_table=False)
+    np.testing.assert_allclose(table["pvalue"].values, [record["pvalue"] for record in records], atol=1e-12)
+
+
+@pytest.mark.unit
+def test_invalid_correction_method_raises():
+    """
+    An unknown correction method raises ValueError when correction is applied.
+    """
+    tester = Tester(
+        dataframe=_three_group_two_metric_frame(),
+        column_groups="group",
+        metrics=["x", "y"],
+        first_type_errors=0.05,
+    )
+    with pytest.raises(ValueError):
+        tester.run("absolute", method="theory", correction_method="not-a-method")
+
+
+@pytest.mark.unit
+def test_correction_with_nan_pvalue_counts_full_family():
+    """
+    A degenerate (constant) metric yields a NaN p-value. It still counts toward
+    the family size, so the surviving metric is corrected by the full family of 2
+    (matching the pre-refactor Bonferroni behavior), and the NaN passes through.
+    """
+    frame = pd.DataFrame(
+        {
+            "group": ["A"] * 10 + ["B"] * 10,
+            "m_ok": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] + [2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
+            "m_const": [5] * 20,
+        }
+    )
+    tester = Tester(dataframe=frame, column_groups="group", metrics=["m_ok", "m_const"], first_type_errors=0.05)
+    raw = {
+        r["metric name"]: r["pvalue"] for r in tester.run("absolute", "theory", correction_method=None, as_table=False)
+    }
+    bonf = {
+        r["metric name"]: r["pvalue"]
+        for r in tester.run("absolute", "theory", correction_method="bonferroni", as_table=False)
+    }
+    assert np.isnan(raw["m_const"]) and np.isnan(bonf["m_const"])
+    assert bonf["m_ok"] == pytest.approx(min(raw["m_ok"] * 2, 1.0), abs=1e-12)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("method", ["holm", "fdr_bh"])
+def test_correction_with_alpha_vector_uses_hypothesis_family(method):
+    """
+    With several first type error levels the result table repeats each hypothesis
+    once per level, but a step-wise correction must use the hypothesis family
+    (size 6 here), not the flattened 12-row table. The corrected p-value of each
+    hypothesis is therefore the family-6 adjustment, shared across the levels.
+    """
+    tester = Tester(
+        dataframe=_three_group_two_metric_frame(),
+        column_groups="group",
+        metrics=["x", "y"],
+        first_type_errors=[0.05, 0.1],
+    )
+    raw_family = tester.run("absolute", "theory", first_type_errors=0.05, correction_method=None, as_table=True)
+    corrected = tester.run("absolute", "theory", correction_method=method, as_table=True)
+    assert len(raw_family) == 6
+    assert len(corrected) == 12
+    assert sorted(np.unique(corrected["first_type_error"]).tolist()) == [0.05, 0.1]
+    expected = mt.adjust_pvalues(raw_family["pvalue"].values, method)  # family size 6
+    unique_corrected = corrected.drop_duplicates(subset=["group A label", "group B label", "metric name"])
+    np.testing.assert_allclose(unique_corrected["pvalue"].values, expected, atol=1e-12)
+
+
+@pytest.mark.unit
+def test_correction_alias_through_tester():
+    """
+    A correction alias passed to the Tester resolves to its canonical method.
+    """
+    tester = Tester(
+        dataframe=_three_group_two_metric_frame(),
+        column_groups="group",
+        metrics=["x", "y"],
+        first_type_errors=0.05,
+    )
+    alias = tester.run("absolute", "theory", correction_method="bh", as_table=True)["pvalue"].values
+    canonical = tester.run("absolute", "theory", correction_method="fdr_bh", as_table=True)["pvalue"].values
+    np.testing.assert_allclose(alias, canonical, atol=1e-12)

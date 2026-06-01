@@ -36,6 +36,7 @@ import numpy as np
 import pandas as pd
 
 import ambrosia.tools.empirical_tools as empirical_pkg
+import ambrosia.tools.multitest as multitest_pkg
 import ambrosia.tools.pvalue_tools as pvalue_pkg
 import ambrosia.tools.stat_criteria as criteria_pkg
 from ambrosia import types
@@ -52,7 +53,7 @@ AVAILABLE_AB_CRITERIA: Dict[str, ABStatCriterion] = {
     "mw": criteria_pkg.MannWhitneyCriterion,
     "wilcoxon": criteria_pkg.WilcoxonCriterion,
 }
-AVAILABLE_MULTITEST_CORRECTIONS: List[str] = ["bonferroni"]
+AVAILABLE_MULTITEST_CORRECTIONS: List[str] = multitest_pkg.available_methods()
 
 
 class Tester(ABToolAbstract):
@@ -416,28 +417,33 @@ class Tester(ABToolAbstract):
         return result
 
     @staticmethod
-    def __apply_first_stage_multitest_correction(
-        alphas: types.StatErrorType, hypothesis_num: int, method: str = "bonferroni"
-    ) -> types.StatErrorType:
+    def __apply_multitest_correction(
+        result: types.TesterResult,
+        metrics: List[types.MetricNameType],
+        method: str,
+        nominal_alpha: np.ndarray,
+    ) -> None:
         """
-        Apply first stage of multitest correction for first type errors.
-        """
-        alphas = alphas.copy()
-        if method == "bonferroni":
-            alphas /= hypothesis_num
-        return alphas
+        Adjust p-values across the whole family of tested hypotheses in place.
 
-    @staticmethod
-    def __apply_second_stage_multitest_correction(
-        result: types.TesterResult, hypothesis_num: int, method: str = "bonferroni"
-    ):
+        The family consists of one p-value per (group pair, metric) combination.
+        Adjusting this vector directly - rather than the flattened result table,
+        which repeats each p-value once per first type error level - keeps the
+        rank-based procedures (Holm, Benjamini-Hochberg, Hommel, ...) correct.
+        The reported ``first_type_error`` is restored to the nominal level, while
+        any confidence-interval widening already performed for the
+        constant-scaling methods (Bonferroni, Sidak) is left untouched.
         """
-        Apply second stage of multitest correction.
-        """
-        if method == "bonferroni":
-            result["pvalue"] = (result["pvalue"].values * hypothesis_num).clip(max=1)
-            result["first_type_error"] *= hypothesis_num
-        return result
+        coordinates: List = []
+        pvalues: List[float] = []
+        for test_name, subresult in result.items():
+            for metric in metrics:
+                coordinates.append((test_name, metric))
+                pvalues.append(float(subresult[metric]["pvalue"]))
+        adjusted: np.ndarray = multitest_pkg.adjust_pvalues(np.asarray(pvalues), method)
+        for (test_name, metric), pvalue in zip(coordinates, adjusted):
+            result[test_name][metric]["pvalue"] = float(pvalue)
+            result[test_name][metric]["first_type_error"] = nominal_alpha
 
     @staticmethod
     def as_table(dict_result: types.TesterResult) -> pd.DataFrame:
@@ -524,10 +530,17 @@ class Tester(ABToolAbstract):
             Statistical criterion for hypotheses testing.
             If ``method`` is ``"theory"`` and no criterion provided,
             ttest for independent samples will be used.
-        correction_method : Union[str, None], default: ``bonferroni``
-            Method for pvalues and confidence intervals multitest correction.
-            Total number of hypothesis is equal to the number of
-            variants combinations * number of metrics passed.
+        correction_method : Union[str, None], default: ``"bonferroni"``
+            Method for multiple hypothesis testing correction of p-values.
+            Supported values: ``"bonferroni"``, ``"sidak"``, ``"holm"``,
+            ``"holm-sidak"``, ``"fdr_bh"`` (Benjamini-Hochberg),
+            ``"fdr_by"`` (Benjamini-Yekutieli), ``"hommel"``,
+            ``"simes-hochberg"``; pass ``None`` to disable correction.
+            The family size equals the number of group-pair combinations
+            times the number of metrics. For ``"bonferroni"`` and ``"sidak"``
+            confidence intervals are widened accordingly; the other, step-wise
+            methods adjust only the p-values and leave intervals at the nominal
+            level.
         as_table : bool, default: ``True``
             Return the test results as a pandas dataframe.
             If ``False``, a list of dicts with results will be returned.
@@ -583,13 +596,15 @@ class Tester(ABToolAbstract):
         hypothesis_num: int = len(list(itertools.combinations(chosen_args["experiment_results"], 2))) * len(
             chosen_args["metrics"]
         )
-        if correction_method is not None and hypothesis_num > 1:
-            if correction_method in AVAILABLE_MULTITEST_CORRECTIONS:
-                chosen_args["alpha"] = Tester.__apply_first_stage_multitest_correction(
-                    chosen_args["alpha"], hypothesis_num, correction_method
-                )
-            else:
-                raise ValueError(f"Choose correction method from {AVAILABLE_MULTITEST_CORRECTIONS}")
+        apply_correction: bool = correction_method is not None and hypothesis_num > 1
+        nominal_alpha: np.ndarray = np.array(chosen_args["alpha"])
+        if apply_correction:
+            correction_method = multitest_pkg.validate_method(correction_method)
+            # Stage 1: widen confidence intervals for constant-scaling methods
+            # (Bonferroni, Sidak); the step-wise methods keep the nominal level.
+            chosen_args["alpha"] = multitest_pkg.alpha_for_confidence_interval(
+                nominal_alpha, correction_method, hypothesis_num
+            )
 
         result: types.TesterResult = {}
         # Variating over all pairs of groups - comb(n, 2)
@@ -603,9 +618,11 @@ class Tester(ABToolAbstract):
             subresult["group_b_label"] = group_b_label
             result[test_name] = subresult
 
+        # Stage 2: adjust the family of p-values and restore the reported alpha.
+        if apply_correction:
+            Tester.__apply_multitest_correction(result, chosen_args["metrics"], correction_method, nominal_alpha)
+
         result = Tester.as_table(result)
-        if correction_method is not None and hypothesis_num > 1:
-            result = Tester.__apply_second_stage_multitest_correction(result, hypothesis_num, correction_method)
         if not as_table:
             result = result.to_dict(orient="records")
         return result
@@ -666,10 +683,17 @@ def test(
         Statistical criterion for hypotheses testing.
         If ``method`` is ``"theory"`` and no criterion provided,
         ttest for independent samples will be used.
-    correction_method : Union[str, None], default: ``bonferroni``
-        Method for pvalues and confidence intervals multitest correction.
-        Total number of hypothesis is equal to the number of
-        variants combinations * number of metrics passed.
+    correction_method : Union[str, None], default: ``"bonferroni"``
+        Method for multiple hypothesis testing correction of p-values.
+        Supported values: ``"bonferroni"``, ``"sidak"``, ``"holm"``,
+        ``"holm-sidak"``, ``"fdr_bh"`` (Benjamini-Hochberg),
+        ``"fdr_by"`` (Benjamini-Yekutieli), ``"hommel"``,
+        ``"simes-hochberg"``; pass ``None`` to disable correction.
+        The family size equals the number of group-pair combinations
+        times the number of metrics. For ``"bonferroni"`` and ``"sidak"``
+        confidence intervals are widened accordingly; the other, step-wise
+        methods adjust only the p-values and leave intervals at the nominal
+        level.
     as_table : bool, default: ``True``
         Return the test results as a pandas dataframe.
         If ``False``, a list of dicts with results will be returned.

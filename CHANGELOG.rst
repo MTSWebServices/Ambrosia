@@ -1,6 +1,37 @@
 Release Notes
 =============
 
+Version 0.5.2 (unreleased)
+---------------------------
+
+**New Features:**
+
+* The ``Tester`` now offers several ways to correct p-values when an experiment
+  evaluates many metrics or many groups at once, not just Bonferroni. Running a
+  lot of comparisons together inflates the chance of a false positive, and a
+  correction keeps that chance under control. The ``correction_method`` argument
+  now accepts:
+
+  * ``"bonferroni"`` (the default, unchanged), ``"holm"``, ``"holm-sidak"``,
+    ``"sidak"``, ``"hommel"`` and ``"simes-hochberg"`` - methods that limit the
+    probability of making *any* false positive. ``"holm"`` and the others are
+    less conservative than Bonferroni, so you keep more statistical power.
+  * ``"fdr_bh"`` (Benjamini-Hochberg) and ``"fdr_by"`` (Benjamini-Yekutieli) -
+    methods that control the false discovery rate, i.e. the expected share of
+    false positives among the metrics you call significant. A popular choice
+    when a dashboard tracks many metrics.
+
+  Existing code keeps working unchanged: Bonferroni stays the default and
+  ``correction_method=None`` turns correction off. Friendly aliases such as
+  ``"benjamini-hochberg"`` are also accepted. For ``"bonferroni"`` and
+  ``"sidak"`` the confidence intervals are widened to match; the other methods
+  adjust the p-values only.
+
+**Internal:**
+
+* Added ``ambrosia/tools/multitest.py`` with native p-value adjustment
+  procedures, cross-validated against ``statsmodels`` and R's ``p.adjust``.
+
 Version 0.5.1 (26.03.2026)
 ---------------------------
 
