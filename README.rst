@@ -9,7 +9,7 @@ Ambrosia
     :target: https://pypi.org/project/ambrosia
 .. |PyPI License| image:: https://img.shields.io/pypi/l/ambrosia.svg
     :target: https://github.com/MobileTeleSystems/Ambrosia/blob/main/LICENSE
-.. |ReadTheDocs| image:: https://img.shields.io/readthedocs/ambrosia.svg
+.. |ReadTheDocs| image:: https://img.shields.io/readthedocs/ambrosia.svg?v=0.5.2
     :target: https://ambrosia.readthedocs.io
 .. |Tests| image:: https://img.shields.io/github/actions/workflow/status/MobileTeleSystems/Ambrosia/test.yaml?branch=main
     :target: https://github.com/MobileTeleSystems/Ambrosia/actions/workflows/test.yaml?query=branch%3Amain+
