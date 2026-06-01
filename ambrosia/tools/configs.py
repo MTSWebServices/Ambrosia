@@ -52,3 +52,18 @@ class Alternatives(AmbrosiaEnum):
 class Effects(AmbrosiaEnum):
     abs: str = "absolute"
     rel: str = "relative"
+
+
+class MultipleTestingCorrection(AmbrosiaEnum):
+    """
+    Supported multiple hypothesis testing correction methods.
+    """
+
+    bonferroni: str = "bonferroni"
+    sidak: str = "sidak"
+    holm: str = "holm"
+    holm_sidak: str = "holm-sidak"
+    fdr_bh: str = "fdr_bh"
+    fdr_by: str = "fdr_by"
+    hommel: str = "hommel"
+    simes_hochberg: str = "simes-hochberg"

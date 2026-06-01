@@ -1,6 +1,30 @@
 Release Notes
 =============
 
+Version 0.5.2 (unreleased)
+---------------------------
+
+**New Features:**
+
+* Additional multiple hypothesis testing corrections in ``Tester``. The
+  ``correction_method`` parameter now accepts ``"sidak"``, ``"holm"``,
+  ``"holm-sidak"``, ``"fdr_bh"`` (Benjamini-Hochberg), ``"fdr_by"``
+  (Benjamini-Yekutieli), ``"hommel"`` and ``"simes-hochberg"`` in addition to
+  the default ``"bonferroni"`` (pass ``None`` to disable). The Benjamini-Hochberg
+  and Benjamini-Yekutieli procedures control the false discovery rate, while the
+  step-wise family-wise procedures (Holm, Holm-Sidak, Hommel, Hochberg) are more
+  powerful than Bonferroni - Holm uniformly so, with Hommel and Hochberg more
+  powerful still under independence or positive dependence. For ``"bonferroni"``
+  and ``"sidak"`` confidence
+  intervals are widened accordingly; the step-wise methods adjust only the
+  p-values and leave intervals at the nominal level. Common aliases such as
+  ``"benjamini-hochberg"`` are also accepted.
+
+**Internal:**
+
+* Added ``ambrosia/tools/multitest.py`` with native p-value adjustment
+  procedures, cross-validated against ``statsmodels`` and R's ``p.adjust``.
+
 Version 0.5.1 (26.03.2026)
 ---------------------------
 
