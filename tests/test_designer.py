@@ -76,7 +76,7 @@ def test_run_theory(param_to_design, expected_value, designer):
     Some tests for method run and theory approach.
     """
     if param_to_design != "power":
-        assert designer.run(param_to_design).iloc[0][0] == expected_value
+        assert designer.run(param_to_design).iloc[0, 0] == expected_value
     else:
         assert designer.run(param_to_design).iloc[0].iloc[0] == expected_value
 
@@ -187,7 +187,7 @@ def test_run_theory_spark(param_to_design, expected_value, designer):
     Some tests for method run and theory approach
     """
     if param_to_design != "power":
-        assert designer.run(param_to_design).iloc[0][0] == expected_value
+        assert designer.run(param_to_design).iloc[0, 0] == expected_value
     else:
         assert designer.run(param_to_design).iloc[0].iloc[0] == expected_value
 

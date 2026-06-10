@@ -159,7 +159,8 @@ class BoxCoxTransformer(AbstractFittableTransformer):
         self._check_fitted()
         self._check_cols(dataframe, self.column_names)
         transformed: pd.DataFrame = dataframe if inplace else dataframe.copy()
-        X: np.ndarray = transformed[self.column_names].values
+        # Copy is required: pandas 3 returns a read-only array from .values
+        X: np.ndarray = transformed[self.column_names].to_numpy(copy=True)
         for num in range(len(self.column_names)):
             if self.lambda_[num] == 0:
                 X[:, num] = np.log(X[:, num])
@@ -216,7 +217,8 @@ class BoxCoxTransformer(AbstractFittableTransformer):
         self._check_fitted()
         self._check_cols(dataframe, self.column_names)
         transformed: pd.DataFrame = dataframe if inplace else dataframe.copy()
-        X_tr: np.ndarray = transformed[self.column_names].values
+        # Copy is required: pandas 3 returns a read-only array from .values
+        X_tr: np.ndarray = transformed[self.column_names].to_numpy(copy=True)
         for num in range(len(self.column_names)):
             if self.lambda_[num] == 0:
                 X_tr[:, num] = np.exp(X_tr[:, num])
