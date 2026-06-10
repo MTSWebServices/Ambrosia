@@ -353,7 +353,7 @@ def test_prior_designing_binary():
     n_incorrect: int = design_binary_size(
         0.99,
         effects=[1.01],
-        methdo="binary",
+        method="binary",
         interval_type="bayes_beta",
         n_success_conjugate=1,
         n_failure_conjugate=1000002,
@@ -362,10 +362,22 @@ def test_prior_designing_binary():
 
     # Test effect
     effect_correct = design_binary_effect(
-        0.1, sizes=[5000], interval_type="bayes_beta", n_success_conjugate=1, n_failure_conjugate=10, as_numeric=True
+        0.1,
+        sizes=[5000],
+        method="binary",
+        interval_type="bayes_beta",
+        n_success_conjugate=1,
+        n_failure_conjugate=10,
+        as_numeric=True,
     ).iloc[0, 0]
     effect_incorrect = design_binary_effect(
-        0.9, sizes=[5000], interval_type="bayes_beta", n_success_conjugate=1, n_failure_conjugate=10, as_numeric=True
+        0.9,
+        sizes=[5000],
+        method="binary",
+        interval_type="bayes_beta",
+        n_success_conjugate=1,
+        n_failure_conjugate=10,
+        as_numeric=True,
     ).iloc[0, 0]
     assert effect_correct > effect_incorrect
 
@@ -374,6 +386,7 @@ def test_prior_designing_binary():
         0.1,
         sizes=5000,
         effects=1.05,
+        method="binary",
         interval_type="bayes_beta",
         n_success_conjugate=1,
         n_failure_conjugate=10,
@@ -383,6 +396,7 @@ def test_prior_designing_binary():
         0.9,
         sizes=5000,
         effects=1.05,
+        method="binary",
         interval_type="bayes_beta",
         n_success_conjugate=1,
         n_failure_conjugate=10,
@@ -390,3 +404,26 @@ def test_prior_designing_binary():
     ).iloc[0, 0]
 
     assert power_correct < power_incorrect
+
+
+@pytest.mark.unit
+def test_binary_design_priors_affect_results():
+    """
+    Regression test for the kwargs threading fix: with ``interval_type="bayes_beta"``
+    the conjugate prior parameters must reach the interval computation, so designs
+    that differ only in the prior must produce different results (previously the
+    extra keyword arguments raised a ``TypeError`` in the design table builders).
+    """
+    common = {"effects": [1.2], "method": "binary", "interval_type": "bayes_beta"}
+    size_weak_prior = design_binary_size(0.05, n_success_conjugate=1, n_failure_conjugate=10, **common).iloc[0, 0]
+    size_strong_prior = design_binary_size(0.05, n_success_conjugate=500, n_failure_conjugate=500, **common).iloc[0, 0]
+    assert size_weak_prior != size_strong_prior
+
+    power_kwargs = {"sizes": 3000, "effects": 1.05, "method": "binary", "as_numeric": True}
+    power_weak = design_binary_power(
+        0.1, interval_type="bayes_beta", n_success_conjugate=1, n_failure_conjugate=10, **power_kwargs
+    ).iloc[0, 0]
+    power_strong = design_binary_power(
+        0.1, interval_type="bayes_beta", n_success_conjugate=2000, n_failure_conjugate=2000, **power_kwargs
+    ).iloc[0, 0]
+    assert power_weak != power_strong
