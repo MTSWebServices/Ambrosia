@@ -1,6 +1,25 @@
 Release Notes
 =============
 
+Version 0.5.3 (unreleased)
+---------------------------
+
+**Bug Fixes:**
+
+* Fixed binary experiment design with Bayesian intervals: the conjugate prior
+  parameters (``n_success_conjugate``, ``n_failure_conjugate``) for
+  ``interval_type="bayes_beta"`` now reach the interval computation in size,
+  effect and power design instead of raising ``TypeError``. Thanks to
+  Artem Vasin for the original fix (#45).
+
+* Fixed one-sided alternatives in the binary design power table: confidence
+  bounds are now built with the correct shape for simulation matrices, so
+  ``alternative="greater"``/``"less"`` no longer fails with a shape error.
+
+* Keyword arguments that collide with internally derived confidence interval
+  arguments (e.g. ``confidence_level``) now raise a clear ``ValueError``
+  instead of silently overriding the design parameters.
+
 Version 0.5.2 (01.06.2026)
 ---------------------------
 

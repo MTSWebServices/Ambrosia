@@ -12,12 +12,38 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 import scipy.stats as sps
 
 from ambrosia import types
+
+
+def merge_ci_kwargs(derived_kwargs: Dict[str, Any], user_kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Merge user keyword arguments into internally derived confidence
+    interval arguments, refusing to override the derived ones.
+
+    Parameters
+    ----------
+    derived_kwargs : Dict[str, Any]
+        Arguments computed from the design parameters.
+    user_kwargs : Dict[str, Any]
+        Extra arguments passed by the caller (e.g. conjugate prior
+        parameters or the hypothesis alternative).
+
+    Returns
+    -------
+    kwargs : Dict[str, Any]
+        Combined keyword arguments.
+    """
+    overlap = set(user_kwargs) & set(derived_kwargs)
+    if overlap:
+        raise ValueError(
+            f"Arguments {sorted(overlap)} are derived from the design parameters and cannot be passed directly"
+        )
+    return {**derived_kwargs, **user_kwargs}
 
 
 def __helper_calc_empirical_power(conf_interval: types.ManyIntervalType) -> np.ndarray:
@@ -42,7 +68,7 @@ def __helper_calc_empirical_power(conf_interval: types.ManyIntervalType) -> np.n
 
 
 def __helper_bin_search_for_size(
-    interval_type: str, confidence_level: float, p_a: float, p_b: float, amount: int, power: float
+    interval_type: str, confidence_level: float, p_a: float, p_b: float, amount: int, power: float, **kwargs
 ) -> int:
     """
     Make binary search for size to gain given power.
@@ -74,14 +100,17 @@ def __helper_bin_search_for_size(
 
         sample_a = sps.binom.rvs(n=trials, p=p_a, size=amount)
         sample_b = sps.binom.rvs(n=trials, p=p_b, size=amount)
-        binom_kwargs = {
-            "interval_type": interval_type,
-            "a_success": sample_a,
-            "b_success": sample_b,
-            "a_trials": trials,
-            "b_trials": trials,
-            "confidence_level": confidence_level,
-        }
+        binom_kwargs = merge_ci_kwargs(
+            {
+                "interval_type": interval_type,
+                "a_success": sample_a,
+                "b_success": sample_b,
+                "a_trials": trials,
+                "b_trials": trials,
+                "confidence_level": confidence_level,
+            },
+            kwargs,
+        )
         conf_interval: types.IntervalType = bi.BinomTwoSampleCI.confidence_interval(**binom_kwargs)
         return __helper_calc_empirical_power(conf_interval)
 
@@ -112,6 +141,7 @@ def __helper_bin_search_for_delta(
     amount: int,
     power: float,
     epsilon: float = 0.0001,
+    **kwargs,
 ) -> Optional[float]:
     """
     Make binary search for delta to gain given power for
@@ -147,14 +177,17 @@ def __helper_bin_search_for_delta(
         sample_a = sps.binom.rvs(n=trials, p=p_a, size=amount)
         p_b: float = p_a - delta
         sample_b = sps.binom.rvs(n=trials, p=p_b, size=amount)
-        binom_kwargs = {
-            "interval_type": interval_type,
-            "a_success": sample_a,
-            "b_success": sample_b,
-            "a_trials": trials,
-            "b_trials": trials,
-            "confidence_level": confidence_level,
-        }
+        binom_kwargs = merge_ci_kwargs(
+            {
+                "interval_type": interval_type,
+                "a_success": sample_a,
+                "b_success": sample_b,
+                "a_trials": trials,
+                "b_trials": trials,
+                "confidence_level": confidence_level,
+            },
+            kwargs,
+        )
         conf_interval: types.IntervalType = bi.BinomTwoSampleCI.confidence_interval(**binom_kwargs)
         return __helper_calc_empirical_power(conf_interval)
 

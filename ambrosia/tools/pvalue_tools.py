@@ -151,11 +151,12 @@ def choose_from_bounds(
     Choose left and right bounds according to alternative
     """
     cond_many: bool = isinstance(left_ci, Iterable)
-    amount: int = len(left_ci) if cond_many else 1
+    # np.full preserves the bounds shape for arrays of any dimension,
+    # e.g. the (amount, grid size) matrices used by the binary power tables.
     if alternative == "greater":
-        right_ci = np.ones(amount) * right_bound if cond_many else right_bound
+        right_ci = np.full(np.shape(right_ci), right_bound, dtype=float) if cond_many else right_bound
     if alternative == "less":
-        left_ci = np.ones(amount) * left_bound if cond_many else left_bound
+        left_ci = np.full(np.shape(left_ci), left_bound, dtype=float) if cond_many else left_bound
     return left_ci, right_ci
 
 
