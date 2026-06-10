@@ -49,9 +49,10 @@ Version 0.5.3 (unreleased)
 * Dev dependencies allow pytest 9 and pytest-cov 7; removed the no-op marks
   on test fixtures that pytest 9 no longer accepts.
 
-* Refreshed locked development dependencies to address security alerts:
-  pillow 12.2, Pygments 2.20, pytest 9.0.3 (Python 3.9 environments keep the
-  latest compatible pillow 11.x and pytest 8.x).
+* Refreshed locked dependencies to address security alerts: pillow 12.2
+  (a transitive runtime dependency), Pygments 2.20 and pytest 9.0.3
+  (Python 3.9 and 3.10 environments keep the latest compatible
+  pillow 11.x and pytest 8.x).
 
 Version 0.5.2 (01.06.2026)
 ---------------------------

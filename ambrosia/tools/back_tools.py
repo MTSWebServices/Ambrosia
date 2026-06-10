@@ -17,7 +17,8 @@ def map_dataframe(dataframe: pd.DataFrame, func: Callable) -> pd.DataFrame:
     Uses ``DataFrame.map`` (pandas >= 2.1) and falls back to ``applymap``,
     which older pandas versions provide and pandas 3 removed.
     """
-    if hasattr(dataframe, "map"):
+    # The class attribute check avoids matching a column named "map".
+    if hasattr(pd.DataFrame, "map"):
         return dataframe.map(func)
     return dataframe.applymap(func)
 
