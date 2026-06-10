@@ -23,7 +23,6 @@ def local_spark_session() -> None:
 
 
 @pytest.fixture()
-@pytest.mark.designer()
 def simple_binary_retention_table() -> pd.DataFrame:
     """
     Simple data frame, contains
@@ -33,7 +32,6 @@ def simple_binary_retention_table() -> pd.DataFrame:
 
 
 @pytest.fixture()
-@pytest.mark.designer()
 def ltv_and_retention_dataset() -> pd.DataFrame:
     """
     Data Frame
@@ -45,7 +43,6 @@ def ltv_and_retention_dataset() -> pd.DataFrame:
 
 
 @pytest.fixture()
-@pytest.mark.designer()
 def designer_simple_table(simple_binary_retention_table):
     """
     Designer instance of simple_binary_retention_table
@@ -57,7 +54,6 @@ def designer_simple_table(simple_binary_retention_table):
 
 
 @pytest.fixture()
-@pytest.mark.designer()
 def designer_ltv(ltv_and_retention_dataset):
     """
     Designer instance of ltv_and_retention_dataset
@@ -69,7 +65,6 @@ def designer_ltv(ltv_and_retention_dataset):
 
 
 @pytest.fixture()
-@pytest.mark.designer()
 def designer_ltv_spark(local_spark_session, ltv_and_retention_dataset):
     """
     Designer based on spark dataframe
@@ -80,7 +75,6 @@ def designer_ltv_spark(local_spark_session, ltv_and_retention_dataset):
 
 
 @pytest.fixture()
-@pytest.mark.tester()
 def results_ltv_retention_conversions() -> pd.DataFrame:
     """
     Table with results of experiment
@@ -90,7 +84,6 @@ def results_ltv_retention_conversions() -> pd.DataFrame:
 
 
 @pytest.fixture()
-@pytest.mark.tester()
 def tester_spark_ltv_ret(local_spark_session, results_ltv_retention_conversions):
     """
     Spark tester
@@ -101,7 +94,6 @@ def tester_spark_ltv_ret(local_spark_session, results_ltv_retention_conversions)
 
 
 @pytest.fixture()
-@pytest.mark.tester()
 def tester_on_ltv_retention(results_ltv_retention_conversions):
     """
     Tester based on results_ltv_retention_conversions
@@ -115,7 +107,6 @@ def tester_on_ltv_retention(results_ltv_retention_conversions):
 
 
 @pytest.fixture()
-@pytest.mark.stratification()
 def stratification_table() -> pd.DataFrame:
     """
     Table for stratification
@@ -125,7 +116,6 @@ def stratification_table() -> pd.DataFrame:
 
 
 @pytest.fixture()
-@pytest.mark.stratification()
 def stratificator(stratification_table):
     """
     Stratification instance on stratification_table
@@ -136,7 +126,6 @@ def stratificator(stratification_table):
 
 
 @pytest.fixture()
-@pytest.mark.stratification()
 def answer_ids_strat(stratificator) -> Dict:
     """
     Answer for test checking B group ids
@@ -151,7 +140,6 @@ def answer_ids_strat(stratificator) -> Dict:
 
 
 @pytest.fixture()
-@pytest.mark.stratification()
 def id_for_b_strat(stratification_table) -> np.ndarray:
     """
     Group B ids for stratification test
@@ -160,7 +148,6 @@ def id_for_b_strat(stratification_table) -> np.ndarray:
 
 
 @pytest.fixture()
-@pytest.mark.stratification()
 def answer_ids_strat_column(stratificator) -> Dict:
     """
     Answer for test checking B group ids using id column
@@ -175,7 +162,6 @@ def answer_ids_strat_column(stratificator) -> Dict:
 
 
 @pytest.fixture()
-@pytest.mark.splitter()
 def data_split() -> pd.DataFrame:
     """
     Table for splitter tests
@@ -185,7 +171,6 @@ def data_split() -> pd.DataFrame:
 
 
 @pytest.fixture()
-@pytest.mark.splitter()
 def data_index_split() -> pd.DataFrame:
     """
     Table with strange index
@@ -198,7 +183,6 @@ def data_index_split() -> pd.DataFrame:
 
 
 @pytest.fixture()
-@pytest.mark.splitter()
 def splitter_ltv_spark(local_spark_session, ltv_and_retention_dataset):
     """
     Splitter based on spark dataframe
@@ -209,7 +193,6 @@ def splitter_ltv_spark(local_spark_session, ltv_and_retention_dataset):
 
 
 @pytest.fixture()
-@pytest.mark.variance()
 def data_variance_lin() -> pd.DataFrame:
     """
     Table with Y = 2 * X_1 + 3 * X_2 + 4 * X_3 + N(0, 0.1)
@@ -219,7 +202,6 @@ def data_variance_lin() -> pd.DataFrame:
 
 
 @pytest.fixture()
-@pytest.mark.variance()
 def data_nonlin_var() -> pd.DataFrame:
     """
     Table with Y = X_1 ** 2 + 3 * sqrt(X_2) + 4 * log(X_3) ** 5 + N(0, 0.1)
@@ -229,7 +211,6 @@ def data_nonlin_var() -> pd.DataFrame:
 
 
 @pytest.fixture()
-@pytest.mark.aggregate()
 def data_for_agg() -> pd.DataFrame:
     """
     Table for aggregation
@@ -240,7 +221,6 @@ def data_for_agg() -> pd.DataFrame:
 
 
 @pytest.fixture()
-@pytest.mark.designer()
 def robust_moments() -> pd.DataFrame:
     """
     Data frame for testing work of robust preprocessing tools.

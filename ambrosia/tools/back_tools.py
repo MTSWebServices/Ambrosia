@@ -3,10 +3,23 @@ from typing import Any, Callable, Dict, Iterable, Optional, Union
 
 import joblib
 import numpy as np
+import pandas as pd
 from tqdm.auto import tqdm
 
 from ambrosia import types
 from ambrosia.tools.decorators import tqdm_parallel_decorator
+
+
+def map_dataframe(dataframe: pd.DataFrame, func: Callable) -> pd.DataFrame:
+    """
+    Apply a function elementwise to a dataframe.
+
+    Uses ``DataFrame.map`` (pandas >= 2.1) and falls back to ``applymap``,
+    which older pandas versions provide and pandas 3 removed.
+    """
+    if hasattr(dataframe, "map"):
+        return dataframe.map(func)
+    return dataframe.applymap(func)
 
 
 def create_seed_sequence(length: int, entropy: Optional[Union[int, Iterable[int]]] = None) -> np.ndarray:

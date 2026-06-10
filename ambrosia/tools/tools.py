@@ -299,9 +299,9 @@ def get_empirical_table_power(
         )
         report = report[list(zip(sample_sizes_a, sample_sizes_b))]
         if as_numeric:
-            report = report.applymap(lambda x: round(x, ROUND_DIGITS_TABLE))
+            report = back_tools.map_dataframe(report, lambda x: round(x, ROUND_DIGITS_TABLE))
         else:
-            report = report.applymap(lambda x: str(round(x * 100, ROUND_DIGITS_PERCENT)) + "%")
+            report = back_tools.map_dataframe(report, lambda x: str(round(x * 100, ROUND_DIGITS_PERCENT)) + "%")
         if len(metrics) == 1:
             reports = report
         else:
@@ -1144,9 +1144,9 @@ def get_empirical_mde_table(
             index=GROUP_SIZE_COL_NAME, columns=STAT_ERRORS_COL_NAME, values=EFFECT_COL_NAME, sort=False
         )
         if as_numeric:
-            report = report.applymap(lambda x: round(x, ROUND_DIGITS_TABLE))
+            report = back_tools.map_dataframe(report, lambda x: round(x, ROUND_DIGITS_TABLE))
         else:
-            report = report.applymap(lambda x: str(round((x - 1) * 100, ROUND_DIGITS_PERCENT)) + "%")
+            report = back_tools.map_dataframe(report, lambda x: str(round((x - 1) * 100, ROUND_DIGITS_PERCENT)) + "%")
         report = report[[(alpha, beta) for alpha in alphas for beta in betas]]
         if len(metrics) == 1:
             reports = report

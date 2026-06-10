@@ -36,6 +36,23 @@ Version 0.5.3 (unreleased)
   arguments (e.g. ``confidence_level``) now raise a clear ``ValueError``
   instead of silently overriding the design parameters.
 
+**Dependencies:**
+
+* Allowed pandas 3.x: the requirement is now ``pandas >=1.5.0, <4.0.0``.
+  Fixed the two pandas 3 incompatibilities in the library: design tables no
+  longer use the removed ``DataFrame.applymap`` (an elementwise helper picks
+  ``DataFrame.map`` or ``applymap`` depending on the pandas version), and
+  ``BoxCoxTransformer`` no longer mutates the read-only arrays that pandas 3
+  returns. The test suite is verified against the full supported range, from
+  pandas 1.5.3 with numpy 1.26 up to pandas 3.x.
+
+* Dev dependencies allow pytest 9 and pytest-cov 7; removed the no-op marks
+  on test fixtures that pytest 9 no longer accepts.
+
+* Refreshed locked development dependencies to address security alerts:
+  pillow 12.2, Pygments 2.20, pytest 9.0.3 (Python 3.9 environments keep the
+  latest compatible pillow 11.x and pytest 8.x).
+
 Version 0.5.2 (01.06.2026)
 ---------------------------
 
