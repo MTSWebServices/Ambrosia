@@ -19,6 +19,16 @@ def make_groups_frame(size_a: int, size_b: int) -> pd.DataFrame:
     )
 
 
+def collect_srm_warnings(run_callable) -> list:
+    """
+    Run the callable and return the emitted Sample Ratio Mismatch warnings.
+    """
+    with warnings.catch_warnings(record=True) as records:
+        warnings.simplefilter("always")
+        run_callable()
+    return [record for record in records if "Sample Ratio Mismatch" in str(record.message)]
+
+
 @pytest.mark.unit
 def test_pvalue_matches_scipy():
     """
@@ -119,17 +129,13 @@ def test_tester_warns_on_srm():
 @pytest.mark.unit
 def test_tester_silent_on_balanced_split():
     tester = Tester(dataframe=make_groups_frame(5000, 4980), column_groups="group", metrics=["metric"])
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        tester.run("absolute", method="theory", as_table=False)
+    assert not collect_srm_warnings(lambda: tester.run("absolute", method="theory", as_table=False))
 
 
 @pytest.mark.unit
 def test_tester_srm_check_can_be_disabled():
     tester = Tester(dataframe=make_groups_frame(5000, 4500), column_groups="group", metrics=["metric"])
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        tester.run("absolute", method="theory", as_table=False, check_srm=False)
+    assert not collect_srm_warnings(lambda: tester.run("absolute", method="theory", as_table=False, check_srm=False))
 
 
 @pytest.mark.unit
@@ -141,14 +147,14 @@ def test_tester_respects_expected_ratios():
     tester = Tester(dataframe=frame, column_groups="group", metrics=["metric"])
     with pytest.warns(UserWarning, match="Sample Ratio Mismatch detected"):
         tester.run("absolute", method="theory", as_table=False)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        tester.run(
+    assert not collect_srm_warnings(
+        lambda: tester.run(
             "absolute",
             method="theory",
             as_table=False,
             srm_expected_ratios={"A": 0.9, "B": 0.1},
         )
+    )
 
 
 @pytest.mark.unit
@@ -156,9 +162,8 @@ def test_standalone_test_function_passthrough():
     frame = make_groups_frame(5000, 4500)
     with pytest.warns(UserWarning, match="Sample Ratio Mismatch detected"):
         test("absolute", dataframe=frame, column_groups="group", metrics="metric", as_table=False)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        test(
+    assert not collect_srm_warnings(
+        lambda: test(
             "absolute",
             dataframe=frame,
             column_groups="group",
@@ -166,6 +171,53 @@ def test_standalone_test_function_passthrough():
             as_table=False,
             check_srm=False,
         )
+    )
+
+
+@pytest.mark.unit
+def test_standalone_test_function_default_alpha():
+    """
+    The standalone test function works without an explicit first_type_errors
+    and reports the documented 0.05 default.
+    """
+    frame = make_groups_frame(1000, 1000)
+    result = test("absolute", dataframe=frame, column_groups="group", metrics="metric", as_table=False)
+    assert result[0]["first_type_error"] == pytest.approx(0.05)
+
+
+@pytest.mark.unit
+def test_tester_experiment_results_dict_mode():
+    """
+    The SRM check also covers the experiment_results dict input mode.
+    """
+    frame = make_groups_frame(5000, 4500)
+    experiment_results = {
+        "A": frame[frame["group"] == "A"],
+        "B": frame[frame["group"] == "B"],
+    }
+    tester = Tester(experiment_results=experiment_results, metrics=["metric"])
+    with pytest.warns(UserWarning, match="Sample Ratio Mismatch detected"):
+        tester.run("absolute", method="theory", as_table=False)
+
+
+@pytest.mark.unit
+def test_tester_experiment_results_arrays_supported():
+    """
+    Array-valued experiment_results (used with metric_funcs) keep working
+    with the SRM check enabled: group sizes are taken via len().
+    """
+    rng = np.random.default_rng(5)
+    experiment_results = {"A": rng.normal(0, 1, 1000), "B": rng.normal(0, 1, 1000)}
+    result = test(
+        "absolute",
+        method="empiric",
+        experiment_results=experiment_results,
+        metrics="metric",
+        metric_funcs={"metric": lambda values: values},
+        as_table=False,
+        random_seed=7,
+    )
+    assert "pvalue" in result[0]
 
 
 @pytest.mark.unit

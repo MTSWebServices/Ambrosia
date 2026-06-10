@@ -18,9 +18,9 @@ Version 0.5.3 (unreleased)
 
 **Bug Fixes:**
 
-* ``Tester`` and the standalone ``test`` function no longer fail when
-  ``first_type_errors`` is not provided explicitly: the documented default
-  ``0.05`` is now applied.
+* The standalone ``test`` function no longer fails when ``first_type_errors``
+  is not provided (the same applies to ``Tester`` with an explicit
+  ``first_type_errors=None``): the documented default ``0.05`` is now applied.
 
 * Fixed binary experiment design with Bayesian intervals: the conjugate prior
   parameters (``n_success_conjugate``, ``n_failure_conjugate``) for

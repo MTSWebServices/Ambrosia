@@ -27,6 +27,7 @@ fires only on strong evidence of a mismatch.
 """
 from typing import Any, Dict, Optional
 
+import numpy as np
 import pandas as pd
 import scipy.stats as sps
 
@@ -63,8 +64,8 @@ def check_srm_from_counts(
     """
     if len(observed) < 2:
         raise ValueError("SRM check requires at least two groups")
-    if any(size < 0 for size in observed.values()):
-        raise ValueError("Observed group sizes must be non-negative")
+    if any(size < 0 or not np.isfinite(size) for size in observed.values()):
+        raise ValueError("Observed group sizes must be non-negative finite numbers")
     total: int = sum(observed.values())
     if total == 0:
         raise ValueError("Observed group sizes are all zero")
@@ -79,8 +80,8 @@ def check_srm_from_counts(
                 f"Labels of expected_ratios {sorted(map(str, expected_ratios))} "
                 f"must match the group labels {sorted(map(str, observed))}"
             )
-        if any(ratio <= 0 for ratio in expected_ratios.values()):
-            raise ValueError("Expected ratios must be positive")
+        if any(ratio <= 0 or not np.isfinite(ratio) for ratio in expected_ratios.values()):
+            raise ValueError("Expected ratios must be positive finite numbers")
         ratios = expected_ratios
     ratios_sum: float = sum(ratios.values())
 
@@ -97,13 +98,17 @@ def check_srm_from_counts(
     }
 
 
-def group_size(dataframe: types.SparkOrPandas) -> int:
+def group_size(group_data: Any) -> int:
     """
-    Return the number of rows in a pandas or Spark dataframe.
+    Return the number of objects in an experimental group.
+
+    Works for any sized container (pandas dataframes, numpy arrays, lists)
+    and falls back to ``count()`` for Spark dataframes.
     """
-    if isinstance(dataframe, pd.DataFrame):
-        return len(dataframe)
-    return dataframe.count()
+    try:
+        return len(group_data)
+    except TypeError:
+        return group_data.count()
 
 
 def check_srm(
@@ -115,13 +120,8 @@ def check_srm(
     """
     Run a Sample Ratio Mismatch check on experiment data.
 
-    Examples
-    --------
-    >>> result = check_srm(df, column_groups="group")
-    >>> result["srm_detected"]
-    False
-    >>> check_srm(df, "group", expected_ratios={"A": 0.9, "B": 0.1})["pvalue"]
-    0.83
+    Null group labels are counted as a separate group for both pandas
+    and Spark dataframes.
 
     Parameters
     ----------
@@ -140,11 +140,16 @@ def check_srm(
     result : Dict[str, Any]
         Dictionary with ``observed`` sizes, ``expected`` sizes, chi-square
         ``pvalue``, the used ``alpha`` and the boolean ``srm_detected``.
+
+    Examples
+    --------
+    >>> check_srm(dataframe, column_groups="group")["srm_detected"]
+    >>> check_srm(dataframe, "group", expected_ratios={"A": 0.9, "B": 0.1})["pvalue"]
     """
     if isinstance(dataframe, pd.DataFrame):
         if column_groups not in dataframe.columns:
             raise ValueError(f"Column {column_groups} is not in dataframe columns")
-        observed = dataframe[column_groups].value_counts().to_dict()
+        observed = dataframe[column_groups].value_counts(dropna=False).to_dict()
     else:
         rows = dataframe.groupBy(column_groups).count().collect()
         observed = {row[column_groups]: row["count"] for row in rows}

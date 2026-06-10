@@ -375,6 +375,33 @@ class Tester(ABToolAbstract):
         return criterion().get_results(group_a=group_a, group_b=group_b, alpha=alpha, effect_type=effect_type, **kwargs)
 
     @staticmethod
+    def __as_error_array(first_type_errors: Optional[types.StatErrorType]) -> Optional[np.ndarray]:
+        """
+        Wrap first type errors into an array, keeping ``None`` untouched.
+        """
+        if first_type_errors is None:
+            return None
+        if isinstance(first_type_errors, float):
+            return np.array([first_type_errors])
+        return np.array(first_type_errors)
+
+    @staticmethod
+    def __warn_on_srm(experiment_results: types.ExperimentResults, expected_ratios: Optional[Dict[Any, float]]) -> None:
+        """
+        Check the group sizes for a Sample Ratio Mismatch and warn if detected.
+        """
+        observed_sizes = {label: srm_pkg.group_size(group_data) for label, group_data in experiment_results.items()}
+        srm_result = srm_pkg.check_srm_from_counts(observed_sizes, expected_ratios=expected_ratios)
+        if srm_result["srm_detected"]:
+            warn(
+                f"Sample Ratio Mismatch detected: observed group sizes {srm_result['observed']} deviate "
+                f"from the expected ratios (chi-square p-value = {srm_result['pvalue']:.3g} < "
+                f"{srm_result['alpha']}). The group assignment may be broken and the test results may be "
+                "unreliable. If the unequal split is intentional, pass srm_expected_ratios; "
+                "to disable this check, set check_srm=False."
+            )
+
+    @staticmethod
     def __pre_run(method: str, args: types._UsageArgumentsType, **kwargs) -> types.TesterResult:
         """
         Function to handle run method on pandas dataframes.
@@ -576,11 +603,7 @@ class Tester(ABToolAbstract):
         """
         if isinstance(metrics, types.MetricNameType):
             metrics = [metrics]
-        if first_type_errors is not None:
-            if isinstance(first_type_errors, float):
-                first_type_errors = np.array([first_type_errors])
-            else:
-                first_type_errors = np.array(first_type_errors)
+        first_type_errors = Tester.__as_error_array(first_type_errors)
         if "alternative" in kwargs:
             pvalue_pkg.check_alternative(kwargs["alternative"])
         else:
@@ -610,18 +633,7 @@ class Tester(ABToolAbstract):
         chosen_args["metric_funcs"] = effective_metric_funcs
 
         if check_srm:
-            observed_sizes = {
-                label: srm_pkg.group_size(group_data) for label, group_data in chosen_args["experiment_results"].items()
-            }
-            srm_result = srm_pkg.check_srm_from_counts(observed_sizes, expected_ratios=srm_expected_ratios)
-            if srm_result["srm_detected"]:
-                warn(
-                    f"Sample Ratio Mismatch detected: observed group sizes {srm_result['observed']} deviate "
-                    f"from the expected ratios (chi-square p-value = {srm_result['pvalue']:.3g} < "
-                    f"{srm_result['alpha']}). The group assignment may be broken and the test results may be "
-                    "unreliable. If the unequal split is intentional, pass srm_expected_ratios; "
-                    "to disable this check, set check_srm=False."
-                )
+            Tester.__warn_on_srm(chosen_args["experiment_results"], srm_expected_ratios)
 
         hypothesis_num: int = len(list(itertools.combinations(chosen_args["experiment_results"], 2))) * len(
             chosen_args["metrics"]
