@@ -29,7 +29,7 @@ development and will be available soon.
 """
 import itertools
 from copy import deepcopy
-from typing import Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 from warnings import warn
 
 import numpy as np
@@ -38,6 +38,7 @@ import pandas as pd
 import ambrosia.tools.empirical_tools as empirical_pkg
 import ambrosia.tools.multitest as multitest_pkg
 import ambrosia.tools.pvalue_tools as pvalue_pkg
+import ambrosia.tools.srm as srm_pkg
 import ambrosia.tools.stat_criteria as criteria_pkg
 from ambrosia import types
 from ambrosia.tools.ab_abstract_component import ABStatCriterion, ABToolAbstract, DataframeHandler, StatCriterion
@@ -206,6 +207,8 @@ class Tester(ABToolAbstract):
         self.__experiment_results = experiment_results
 
     def set_errors(self, first_type_errors: types.StatErrorType) -> None:
+        if first_type_errors is None:
+            first_type_errors = 0.05
         if isinstance(first_type_errors, float):
             self.__alpha = np.array([first_type_errors])
         else:
@@ -495,6 +498,8 @@ class Tester(ABToolAbstract):
         correction_method: Union[str, None] = "bonferroni",
         as_table: bool = True,
         metric_funcs: Optional[Dict[str, Callable]] = None,
+        check_srm: bool = True,
+        srm_expected_ratios: Optional[Dict[Any, float]] = None,
         **kwargs,
     ) -> types.TesterResult:
         """
@@ -549,6 +554,17 @@ class Tester(ABToolAbstract):
             Each function receives a group ``pd.DataFrame`` and returns
             array-like values. Overrides functions set in constructor
             for matching metric names. Only pandas DataFrames supported.
+        check_srm : bool, default: ``True``
+            Run a Sample Ratio Mismatch check on the group sizes before
+            testing and emit a warning if the observed sizes deviate from
+            the expected ratios (chi-square test at the ``0.0005`` level).
+            A detected mismatch usually means a broken assignment procedure,
+            making the test results unreliable.
+        srm_expected_ratios : Dict[Any, float], optional
+            Expected group size ratios for the Sample Ratio Mismatch check,
+            mapping group label to its share (normalized internally).
+            Pass it when the split is intentionally unequal.
+            If ``None``, equal group sizes are expected.
         **kwargs : Dict
             Other keyword arguments.
 
@@ -592,6 +608,20 @@ class Tester(ABToolAbstract):
         chosen_args["criterion"] = criterion
         effective_metric_funcs = {**self.__metric_funcs, **(metric_funcs or {})}
         chosen_args["metric_funcs"] = effective_metric_funcs
+
+        if check_srm:
+            observed_sizes = {
+                label: srm_pkg.group_size(group_data) for label, group_data in chosen_args["experiment_results"].items()
+            }
+            srm_result = srm_pkg.check_srm_from_counts(observed_sizes, expected_ratios=srm_expected_ratios)
+            if srm_result["srm_detected"]:
+                warn(
+                    f"Sample Ratio Mismatch detected: observed group sizes {srm_result['observed']} deviate "
+                    f"from the expected ratios (chi-square p-value = {srm_result['pvalue']:.3g} < "
+                    f"{srm_result['alpha']}). The group assignment may be broken and the test results may be "
+                    "unreliable. If the unequal split is intentional, pass srm_expected_ratios; "
+                    "to disable this check, set check_srm=False."
+                )
 
         hypothesis_num: int = len(list(itertools.combinations(chosen_args["experiment_results"], 2))) * len(
             chosen_args["metrics"]
@@ -643,6 +673,8 @@ def test(
     correction_method: Union[str, None] = "bonferroni",
     as_table: bool = True,
     metric_funcs: Optional[Dict[str, Callable]] = None,
+    check_srm: bool = True,
+    srm_expected_ratios: Optional[Dict[Any, float]] = None,
     **kwargs,
 ) -> types.TesterResult:
     """
@@ -701,6 +733,13 @@ def test(
         Dictionary mapping metric names to callable functions.
         Each function receives a group ``pd.DataFrame`` and returns
         array-like values. Only pandas DataFrames supported.
+    check_srm : bool, default: ``True``
+        Run a Sample Ratio Mismatch check on the group sizes before
+        testing and emit a warning if the observed sizes deviate from
+        the expected ratios.
+    srm_expected_ratios : Dict[Any, float], optional
+        Expected group size ratios for the Sample Ratio Mismatch check.
+        Pass it when the split is intentionally unequal.
     **kwargs : Dict
         Other keyword arguments.
 
@@ -726,5 +765,7 @@ def test(
         correction_method=correction_method,
         as_table=as_table,
         metric_funcs=metric_funcs,
+        check_srm=check_srm,
+        srm_expected_ratios=srm_expected_ratios,
         **kwargs,
     )

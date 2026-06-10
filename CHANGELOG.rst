@@ -4,7 +4,23 @@ Release Notes
 Version 0.5.3 (unreleased)
 ---------------------------
 
+**New Features:**
+
+* Sample Ratio Mismatch (SRM) check. A broken assignment, filtering or logging
+  pipeline often shows up as group sizes that deviate from the planned split -
+  and then any test result on such groups cannot be trusted. The ``Tester`` now
+  verifies the observed group sizes with a chi-square test (strict ``0.0005``
+  level) before evaluating the results and emits a warning when a mismatch is
+  detected. For intentionally unequal splits pass ``srm_expected_ratios``
+  (e.g. ``{"A": 0.9, "B": 0.1}``); disable with ``check_srm=False``. The same
+  diagnostic is available standalone as ``ambrosia.tools.srm.check_srm`` for
+  pandas and Spark dataframes.
+
 **Bug Fixes:**
+
+* ``Tester`` and the standalone ``test`` function no longer fail when
+  ``first_type_errors`` is not provided explicitly: the documented default
+  ``0.05`` is now applied.
 
 * Fixed binary experiment design with Bayesian intervals: the conjugate prior
   parameters (``n_success_conjugate``, ``n_failure_conjugate``) for
