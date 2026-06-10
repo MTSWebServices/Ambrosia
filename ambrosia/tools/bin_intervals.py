@@ -426,15 +426,17 @@ def get_table_power_on_size_and_conversions(
         for p_b in p_b_values:
             sample_a = sps.binom.rvs(n=trials, p=p_a, size=(amount, len(sample_sizes)))
             sample_b = sps.binom.rvs(n=trials, p=p_b, size=(amount, len(sample_sizes)))
-            binom_kwargs = {
-                "interval_type": interval_type,
-                "a_success": sample_a,
-                "b_success": sample_b,
-                "a_trials": trials,
-                "b_trials": trials,
-                "confidence_level": confidence_level,
-                **kwargs,
-            }
+            binom_kwargs = helper_dir.merge_ci_kwargs(
+                {
+                    "interval_type": interval_type,
+                    "a_success": sample_a,
+                    "b_success": sample_b,
+                    "a_trials": trials,
+                    "b_trials": trials,
+                    "confidence_level": confidence_level,
+                },
+                kwargs,
+            )
             conf_interval: types.ManyIntervalType = BinomTwoSampleCI.confidence_interval(**binom_kwargs)
             power: np.ndarray = helper_dir.__helper_calc_empirical_power(conf_interval)
             powers_array.append(power)
@@ -516,16 +518,17 @@ def get_table_power_on_size_and_delta(
     for alpha in first_errors:
         for p_b, delta in zip(p_b_values, grid_delta):
             sample_b = sps.binom.rvs(n=trials, p=p_b, size=(amount, trials.shape[0]))
-            binom_kwargs = {
-                "interval_type": interval_type,
-                "a_success": sample_a,
-                "b_success": sample_b,
-                "a_trials": trials,
-                "b_trials": trials,
-                "confidence_level": 1 - alpha,
-                #    "alternative": alternative,
-                **kwargs,
-            }
+            binom_kwargs = helper_dir.merge_ci_kwargs(
+                {
+                    "interval_type": interval_type,
+                    "a_success": sample_a,
+                    "b_success": sample_b,
+                    "a_trials": trials,
+                    "b_trials": trials,
+                    "confidence_level": 1 - alpha,
+                },
+                kwargs,
+            )
             conf_interval: types.ManyIntervalType = BinomTwoSampleCI.confidence_interval(**binom_kwargs)
             power: np.ndarray = helper_dir.__helper_calc_empirical_power(conf_interval)
             if as_numeric:

@@ -7,6 +7,7 @@ import pytest
 import yaml
 from pytest_lazy_fixtures import lf
 
+import ambrosia.tools.bin_intervals as bin_pkg
 from ambrosia.designer import (
     Designer,
     design,
@@ -340,6 +341,7 @@ def test_groups_ratio_parameter(to_design, method, effects, sizes, designer_ltv)
 
 @pytest.mark.smoke
 def test_prior_designing_binary():
+    np.random.seed(33)
     # Correct prior
     n_correct: int = design_binary_size(
         0.01,
@@ -414,6 +416,7 @@ def test_binary_design_priors_affect_results():
     that differ only in the prior must produce different results (previously the
     extra keyword arguments raised a ``TypeError`` in the design table builders).
     """
+    np.random.seed(33)
     common = {"effects": [1.2], "method": "binary", "interval_type": "bayes_beta"}
     size_weak_prior = design_binary_size(0.05, n_success_conjugate=1, n_failure_conjugate=10, **common).iloc[0, 0]
     size_strong_prior = design_binary_size(0.05, n_success_conjugate=500, n_failure_conjugate=500, **common).iloc[0, 0]
@@ -427,3 +430,61 @@ def test_binary_design_priors_affect_results():
         0.1, interval_type="bayes_beta", n_success_conjugate=2000, n_failure_conjugate=2000, **power_kwargs
     ).iloc[0, 0]
     assert power_weak != power_strong
+
+
+@pytest.mark.unit
+def test_binary_design_priors_via_designer_class():
+    """
+    The Designer class route must also deliver the prior parameters to the
+    interval computation.
+    """
+    np.random.seed(33)
+    frame = pd.DataFrame({"conversion": np.array([0, 1] * 50)})
+    designer = Designer(dataframe=frame, metrics="conversion", effects=[1.2])
+    size_weak = designer.run(
+        "size", method="binary", interval_type="bayes_beta", n_success_conjugate=1, n_failure_conjugate=10
+    ).iloc[0, 0]
+    size_strong = designer.run(
+        "size", method="binary", interval_type="bayes_beta", n_success_conjugate=500, n_failure_conjugate=500
+    ).iloc[0, 0]
+    assert size_weak != size_strong
+
+
+@pytest.mark.unit
+def test_derived_ci_arguments_cannot_be_overridden():
+    """
+    Keyword arguments colliding with internally derived confidence interval
+    arguments must raise instead of silently overriding them.
+    """
+    with pytest.raises(ValueError, match="derived from the design parameters"):
+        bin_pkg.get_table_power_on_size_and_delta(
+            p_a=0.3,
+            sample_sizes=[500],
+            first_errors=[0.05],
+            delta_relative_values=[1.1],
+            confidence_level=0.9,
+        )
+    with pytest.raises(ValueError, match="derived from the design parameters"):
+        design_binary_size(0.05, effects=[1.2], method="binary", a_trials=100)
+
+
+@pytest.mark.unit
+def test_one_sided_alternative_binary_power_table():
+    """
+    One-sided alternatives flow into the binary power table without shape
+    errors (regression for the 2-D confidence bounds handling) and a one-sided
+    test is at least as powerful as the two-sided one.
+    """
+    np.random.seed(33)
+    table_kwargs = {
+        "p_a": 0.3,
+        "sample_sizes": [1000],
+        "first_errors": [0.05],
+        "delta_relative_values": [1.15],
+        "amount": 2000,
+        "as_numeric": True,
+    }
+    power_two_sided = bin_pkg.get_table_power_on_size_and_delta(**table_kwargs).iloc[0, 0]
+    power_greater = bin_pkg.get_table_power_on_size_and_delta(alternative="greater", **table_kwargs).iloc[0, 0]
+    assert 0.0 <= power_greater <= 1.0
+    assert power_greater >= power_two_sided
