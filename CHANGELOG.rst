@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.5.3 (unreleased)
+Version 0.5.3 (11.06.2026)
 ---------------------------
 
 **New Features:**
