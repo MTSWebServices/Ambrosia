@@ -1,18 +1,6 @@
 Release Notes
 =============
 
-Version 0.5.4 (unreleased)
----------------------------
-
-**Changes:**
-
-* The Sample Ratio Mismatch check in ``Tester`` is now opt-in: ``run`` no
-  longer verifies the group sizes by default, so existing pipelines get no
-  new warnings and no extra Spark jobs. Pass ``check_srm=True`` to enable
-  the check with equal expected sizes; providing ``srm_expected_ratios``
-  enables it automatically (an explicit ``check_srm=False`` always wins).
-  The standalone ``ambrosia.tools.srm.check_srm`` is unchanged.
-
 Version 0.5.3 (11.06.2026)
 ---------------------------
 
@@ -20,13 +8,15 @@ Version 0.5.3 (11.06.2026)
 
 * Sample Ratio Mismatch (SRM) check. A broken assignment, filtering or logging
   pipeline often shows up as group sizes that deviate from the planned split -
-  and then any test result on such groups cannot be trusted. The ``Tester`` now
-  verifies the observed group sizes with a chi-square test (strict ``0.0005``
-  level) before evaluating the results and emits a warning when a mismatch is
-  detected. For intentionally unequal splits pass ``srm_expected_ratios``
-  (e.g. ``{"A": 0.9, "B": 0.1}``); disable with ``check_srm=False``. The same
-  diagnostic is available standalone as ``ambrosia.tools.srm.check_srm`` for
-  pandas and Spark dataframes.
+  and then any test result on such groups cannot be trusted. ``Tester.run``
+  can now verify the observed group sizes with a chi-square test (strict
+  ``0.0005`` level) before evaluating the results and warn when a mismatch
+  is detected. The check is opt-in: pass ``check_srm=True`` for equal
+  expected sizes, or provide ``srm_expected_ratios``
+  (e.g. ``{"A": 0.9, "B": 0.1}``) for intentionally unequal splits - the
+  ratios enable the check automatically. The same diagnostic is available
+  standalone as ``ambrosia.tools.srm.check_srm`` for pandas and Spark
+  dataframes.
 
 **Bug Fixes:**
 
