@@ -24,6 +24,10 @@ The check is a chi-square goodness-of-fit test of the observed group sizes
 against the expected ratios. Following the industry practice, a strict
 default significance level (``alpha=0.0005``) is used so that the alarm
 fires only on strong evidence of a mismatch.
+
+The dataframe-based check assumes one row per randomization unit (e.g. one
+user). For event- or session-level data aggregate to units first, or pass
+the unit counts directly to ``check_srm_from_counts``.
 """
 from typing import Any, Dict, Optional
 
@@ -120,8 +124,11 @@ def check_srm(
     """
     Run a Sample Ratio Mismatch check on experiment data.
 
+    The dataframe must contain one row per randomization unit (e.g. one
+    user); on event- or session-level data the chi-square test is invalid.
     Null group labels are counted as a separate group for both pandas
-    and Spark dataframes.
+    and Spark dataframes. For Spark dataframes the check triggers a count
+    job over the table.
 
     Parameters
     ----------

@@ -466,6 +466,43 @@ def test_derived_ci_arguments_cannot_be_overridden():
         )
     with pytest.raises(ValueError, match="derived from the design parameters"):
         design_binary_size(0.05, effects=[1.2], method="binary", a_trials=100)
+    with pytest.raises(ValueError, match="derived from the design parameters"):
+        design_binary_size(0.05, effects=[1.2], method="binary", confidence_level=0.9)
+    with pytest.raises(ValueError, match="derived from the design parameters"):
+        design_binary_effect(0.1, sizes=[500], method="binary", confidence_level=0.9)
+
+
+@pytest.mark.unit
+def test_binary_standalone_one_sided_alternative():
+    """
+    The standalone design_binary_* functions honor ``alternative`` for
+    ``method="binary"``: a one-sided test is more powerful, hence requires
+    a smaller sample size (previously the argument was silently dropped).
+    """
+    np.random.seed(33)
+    power_kwargs = {"sizes": 1500, "effects": 1.2, "method": "binary", "as_numeric": True}
+    power_two_sided = design_binary_power(0.3, **power_kwargs).iloc[0, 0]
+    power_greater = design_binary_power(0.3, alternative="greater", **power_kwargs).iloc[0, 0]
+    assert power_greater > power_two_sided
+
+    size_two_sided = design_binary_size(0.05, effects=[1.5], method="binary").iloc[0, 0]
+    size_greater = design_binary_size(0.05, effects=[1.5], method="binary", alternative="greater").iloc[0, 0]
+    assert size_greater < size_two_sided
+
+
+@pytest.mark.unit
+def test_binary_groups_ratio_warns():
+    """
+    Unequal group ratios are not implemented for the binary design method:
+    passing one emits a warning instead of being silently ignored.
+    """
+    np.random.seed(33)
+    with pytest.warns(UserWarning, match="groups_ratio is not supported"):
+        design_binary_size(0.05, effects=[1.5], method="binary", groups_ratio=2.0)
+    with pytest.warns(UserWarning, match="groups_ratio is not supported"):
+        design_binary_effect(0.1, sizes=[1000], method="binary", groups_ratio=2.0)
+    with pytest.warns(UserWarning, match="groups_ratio is not supported"):
+        design_binary_power(0.1, sizes=1000, effects=1.1, method="binary", groups_ratio=2.0)
 
 
 @pytest.mark.unit

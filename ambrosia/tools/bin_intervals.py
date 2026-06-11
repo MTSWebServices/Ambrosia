@@ -552,6 +552,7 @@ def iterate_for_sample_size(
     """
     Iterate over params for different sample size
     """
+    helper_dir.check_reserved_kwargs(kwargs, ["interval_type", "confidence_level", "p_a", "p_b", "amount", "power"])
     # values = [(round(a, ROUND_DIGITS), round(b, ROUND_DIGITS)) for a in first_errors for b in second_errors]
     # table: pd.DataFrame = pd.DataFrame(
     #     index=pd.MultiIndex.from_tuples(values, names=[r"$\alpha$", r"$\beta$"]),
@@ -657,6 +658,9 @@ def iterate_for_delta(
     """
     Helps to find effect for different params.
     """
+    helper_dir.check_reserved_kwargs(
+        kwargs, ["interval_type", "confidence_level", "p_a", "trials", "amount", "power", "epsilon"]
+    )
     multiindex = pd.MultiIndex.from_tuples([(trials,) for trials in sample_sizes], names=[GROUP_SIZE_COL_NAME])
     multicols = pd.MultiIndex.from_tuples(
         [(f"({alpha}; {beta})",) for alpha in first_errors for beta in second_errors],
