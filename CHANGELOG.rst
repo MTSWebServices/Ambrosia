@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.5.4 (unreleased)
+---------------------------
+
+**Changes:**
+
+* The Sample Ratio Mismatch check in ``Tester`` is now opt-in: ``run`` no
+  longer verifies the group sizes by default, so existing pipelines get no
+  new warnings and no extra Spark jobs. Pass ``check_srm=True`` to enable
+  the check with equal expected sizes; providing ``srm_expected_ratios``
+  enables it automatically (an explicit ``check_srm=False`` always wins).
+  The standalone ``ambrosia.tools.srm.check_srm`` is unchanged.
+
 Version 0.5.3 (11.06.2026)
 ---------------------------
 
