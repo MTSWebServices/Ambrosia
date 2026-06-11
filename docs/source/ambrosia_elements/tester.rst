@@ -21,13 +21,14 @@ and calculating the experimental uplift value with corresponding confidence inte
 .. admonition:: Sample Ratio Mismatch check
    :class: caution
 
-   Before evaluating the results, ``Tester`` checks that the observed group sizes match the expected
-   ratios (a chi-square test at the strict ``0.0005`` level) and emits a warning when a Sample Ratio
-   Mismatch is detected — such a mismatch usually means a broken assignment procedure, making the test
-   results unreliable. The check assumes one row per randomization unit (e.g. one user): on event- or
-   session-level data aggregate to units first or disable the check. For intentionally unequal splits
-   pass ``srm_expected_ratios`` (e.g. ``{"A": 0.9, "B": 0.1}``); the check can be disabled with
-   ``check_srm=False`` (for Spark data it costs one count job per group).
+   ``Tester`` can verify that the observed group sizes match the expected ratios before evaluating
+   the results (a chi-square test at the strict ``0.0005`` level) and warn when a Sample Ratio
+   Mismatch is detected — such a mismatch usually means a broken assignment procedure, making the
+   test results unreliable. The check is opt-in: pass ``check_srm=True`` to ``run`` for equal
+   expected sizes, or provide ``srm_expected_ratios`` (e.g. ``{"A": 0.9, "B": 0.1}``) for
+   intentionally unequal splits — supplying the ratios enables the check automatically.
+   The check assumes one row per randomization unit (e.g. one user): on event- or session-level
+   data aggregate to units first; for Spark data it costs one count job per group.
    The standalone function ``ambrosia.tools.srm.check_srm`` runs the same diagnostic on any
    pandas or Spark dataframe.
 

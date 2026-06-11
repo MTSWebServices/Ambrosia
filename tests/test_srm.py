@@ -138,19 +138,46 @@ def test_dataframe_wrapper_missing_column():
 def test_tester_warns_on_srm():
     tester = Tester(dataframe=make_groups_frame(5000, 4500), column_groups="group", metrics=["metric"])
     with pytest.warns(UserWarning, match="Sample Ratio Mismatch detected"):
-        tester.run("absolute", method="theory", as_table=False)
+        tester.run("absolute", method="theory", as_table=False, check_srm=True)
 
 
 @pytest.mark.unit
 def test_tester_silent_on_balanced_split():
     tester = Tester(dataframe=make_groups_frame(5000, 4980), column_groups="group", metrics=["metric"])
+    assert not collect_srm_warnings(lambda: tester.run("absolute", method="theory", as_table=False, check_srm=True))
+
+
+@pytest.mark.unit
+def test_tester_srm_off_by_default():
+    """
+    The check is opt-in: a skewed split produces no warning unless enabled.
+    """
+    tester = Tester(dataframe=make_groups_frame(5000, 4500), column_groups="group", metrics=["metric"])
     assert not collect_srm_warnings(lambda: tester.run("absolute", method="theory", as_table=False))
 
 
 @pytest.mark.unit
-def test_tester_srm_check_can_be_disabled():
+def test_tester_explicit_false_wins_over_ratios():
     tester = Tester(dataframe=make_groups_frame(5000, 4500), column_groups="group", metrics=["metric"])
-    assert not collect_srm_warnings(lambda: tester.run("absolute", method="theory", as_table=False, check_srm=False))
+    assert not collect_srm_warnings(
+        lambda: tester.run(
+            "absolute",
+            method="theory",
+            as_table=False,
+            check_srm=False,
+            srm_expected_ratios={"A": 0.5, "B": 0.5},
+        )
+    )
+
+
+@pytest.mark.unit
+def test_ratios_alone_enable_check():
+    """
+    Providing srm_expected_ratios opts into the check automatically.
+    """
+    tester = Tester(dataframe=make_groups_frame(5000, 4500), column_groups="group", metrics=["metric"])
+    with pytest.warns(UserWarning, match="Sample Ratio Mismatch detected"):
+        tester.run("absolute", method="theory", as_table=False, srm_expected_ratios={"A": 0.5, "B": 0.5})
 
 
 @pytest.mark.unit
@@ -161,7 +188,7 @@ def test_tester_respects_expected_ratios():
     frame = make_groups_frame(9000, 1020)
     tester = Tester(dataframe=frame, column_groups="group", metrics=["metric"])
     with pytest.warns(UserWarning, match="Sample Ratio Mismatch detected"):
-        tester.run("absolute", method="theory", as_table=False)
+        tester.run("absolute", method="theory", as_table=False, check_srm=True)
     assert not collect_srm_warnings(
         lambda: tester.run(
             "absolute",
@@ -176,7 +203,7 @@ def test_tester_respects_expected_ratios():
 def test_standalone_test_function_passthrough():
     frame = make_groups_frame(5000, 4500)
     with pytest.warns(UserWarning, match="Sample Ratio Mismatch detected"):
-        test("absolute", dataframe=frame, column_groups="group", metrics="metric", as_table=False)
+        test("absolute", dataframe=frame, column_groups="group", metrics="metric", as_table=False, check_srm=True)
     assert not collect_srm_warnings(
         lambda: test(
             "absolute",
@@ -184,7 +211,6 @@ def test_standalone_test_function_passthrough():
             column_groups="group",
             metrics="metric",
             as_table=False,
-            check_srm=False,
         )
     )
 
@@ -212,7 +238,7 @@ def test_tester_experiment_results_dict_mode():
     }
     tester = Tester(experiment_results=experiment_results, metrics=["metric"])
     with pytest.warns(UserWarning, match="Sample Ratio Mismatch detected"):
-        tester.run("absolute", method="theory", as_table=False)
+        tester.run("absolute", method="theory", as_table=False, check_srm=True)
 
 
 @pytest.mark.unit
@@ -231,6 +257,7 @@ def test_tester_experiment_results_arrays_supported():
         metric_funcs={"metric": lambda values: values},
         as_table=False,
         random_seed=7,
+        check_srm=True,
     )
     assert "pvalue" in result[0]
 

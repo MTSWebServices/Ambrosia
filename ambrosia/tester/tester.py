@@ -525,7 +525,7 @@ class Tester(ABToolAbstract):
         correction_method: Union[str, None] = "bonferroni",
         as_table: bool = True,
         metric_funcs: Optional[Dict[str, Callable]] = None,
-        check_srm: bool = True,
+        check_srm: Optional[bool] = None,
         srm_expected_ratios: Optional[Dict[Any, float]] = None,
         **kwargs,
     ) -> types.TesterResult:
@@ -581,14 +581,17 @@ class Tester(ABToolAbstract):
             Each function receives a group ``pd.DataFrame`` and returns
             array-like values. Overrides functions set in constructor
             for matching metric names. Only pandas DataFrames supported.
-        check_srm : bool, default: ``True``
+        check_srm : bool, optional
             Run a Sample Ratio Mismatch check on the group sizes before
             testing and emit a warning if the observed sizes deviate from
             the expected ratios (chi-square test at the ``0.0005`` level).
             A detected mismatch usually means a broken assignment procedure,
-            making the test results unreliable. The check assumes one row
-            per randomization unit (e.g. one user); for Spark data it
-            triggers a count job per group.
+            making the test results unreliable. By default the check runs
+            only when ``srm_expected_ratios`` is provided; pass ``True`` to
+            enable it with equal expected sizes or ``False`` to disable it
+            entirely. The check assumes one row per randomization unit
+            (e.g. one user); for Spark data it triggers a count job per
+            group.
         srm_expected_ratios : Dict[Any, float], optional
             Expected group size ratios for the Sample Ratio Mismatch check,
             mapping group label to its share (normalized internally).
@@ -634,7 +637,8 @@ class Tester(ABToolAbstract):
         effective_metric_funcs = {**self.__metric_funcs, **(metric_funcs or {})}
         chosen_args["metric_funcs"] = effective_metric_funcs
 
-        if check_srm:
+        run_srm_check: bool = check_srm if check_srm is not None else srm_expected_ratios is not None
+        if run_srm_check:
             Tester.__warn_on_srm(chosen_args["experiment_results"], srm_expected_ratios)
 
         hypothesis_num: int = len(list(itertools.combinations(chosen_args["experiment_results"], 2))) * len(
@@ -687,7 +691,7 @@ def test(
     correction_method: Union[str, None] = "bonferroni",
     as_table: bool = True,
     metric_funcs: Optional[Dict[str, Callable]] = None,
-    check_srm: bool = True,
+    check_srm: Optional[bool] = None,
     srm_expected_ratios: Optional[Dict[Any, float]] = None,
     **kwargs,
 ) -> types.TesterResult:
@@ -747,10 +751,12 @@ def test(
         Dictionary mapping metric names to callable functions.
         Each function receives a group ``pd.DataFrame`` and returns
         array-like values. Only pandas DataFrames supported.
-    check_srm : bool, default: ``True``
+    check_srm : bool, optional
         Run a Sample Ratio Mismatch check on the group sizes before
         testing and emit a warning if the observed sizes deviate from
-        the expected ratios.
+        the expected ratios. By default the check runs only when
+        ``srm_expected_ratios`` is provided; pass ``True`` to enable it
+        with equal expected sizes or ``False`` to disable it entirely.
     srm_expected_ratios : Dict[Any, float], optional
         Expected group size ratios for the Sample Ratio Mismatch check.
         Pass it when the split is intentionally unequal.
