@@ -651,7 +651,11 @@ def design_binary_size(
         )
     elif method == "binary":
         if groups_ratio != 1.0:
-            warn("groups_ratio is not supported for the binary method and is ignored: equal group sizes are designed")
+            warn(
+                "groups_ratio is not supported for the binary method and is ignored: equal group sizes are "
+                "designed (use method='theory' for unequal groups)",
+                stacklevel=2,
+            )
         return bin_pkg.get_table_sample_size_on_effect(
             p_a=prob_a,
             first_errors=first_type_errors,
@@ -740,7 +744,11 @@ def design_binary_effect(
         )
     elif method == "binary":
         if groups_ratio != 1.0:
-            warn("groups_ratio is not supported for the binary method and is ignored: equal group sizes are designed")
+            warn(
+                "groups_ratio is not supported for the binary method and is ignored: equal group sizes are "
+                "designed (use method='theory' for unequal groups)",
+                stacklevel=2,
+            )
         return bin_pkg.get_table_effect_on_sample_size(
             p_a=prob_a,
             sample_sizes=sizes,
@@ -830,7 +838,11 @@ def design_binary_power(
         )
     elif method == "binary":
         if groups_ratio != 1.0:
-            warn("groups_ratio is not supported for the binary method and is ignored: equal group sizes are designed")
+            warn(
+                "groups_ratio is not supported for the binary method and is ignored: equal group sizes are "
+                "designed (use method='theory' for unequal groups)",
+                stacklevel=2,
+            )
         return bin_pkg.get_table_power_on_size_and_delta(
             p_a=prob_a,
             sample_sizes=sizes,

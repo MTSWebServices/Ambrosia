@@ -658,9 +658,7 @@ def iterate_for_delta(
     """
     Helps to find effect for different params.
     """
-    helper_dir.check_reserved_kwargs(
-        kwargs, ["interval_type", "confidence_level", "p_a", "trials", "amount", "power", "epsilon"]
-    )
+    helper_dir.check_reserved_kwargs(kwargs, ["interval_type", "confidence_level", "p_a", "trials", "amount", "power"])
     multiindex = pd.MultiIndex.from_tuples([(trials,) for trials in sample_sizes], names=[GROUP_SIZE_COL_NAME])
     multicols = pd.MultiIndex.from_tuples(
         [(f"({alpha}; {beta})",) for alpha in first_errors for beta in second_errors],
