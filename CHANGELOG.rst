@@ -36,6 +36,12 @@ Version 0.5.3 (unreleased)
   arguments (e.g. ``confidence_level``) now raise a clear ``ValueError``
   instead of silently overriding the design parameters.
 
+* The standalone ``design_binary_size`` / ``design_binary_effect`` /
+  ``design_binary_power`` functions now honor ``alternative`` for
+  ``method="binary"`` (previously the argument was silently dropped and the
+  design was always two-sided) and warn about the unsupported
+  ``groups_ratio`` instead of silently designing equal groups.
+
 **Dependencies:**
 
 * Allowed pandas 3.x: the requirement is now ``pandas >=1.5.0, <4.0.0``.

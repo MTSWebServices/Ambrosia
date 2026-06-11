@@ -12,12 +12,31 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 import numpy as np
 import scipy.stats as sps
 
 from ambrosia import types
+
+
+def check_reserved_kwargs(user_kwargs: Dict[str, Any], reserved: Iterable[str]) -> None:
+    """
+    Raise if user keyword arguments collide with arguments derived from
+    the design parameters.
+
+    Parameters
+    ----------
+    user_kwargs : Dict[str, Any]
+        Extra arguments passed by the caller.
+    reserved : Iterable[str]
+        Names of arguments computed from the design parameters.
+    """
+    overlap = set(user_kwargs) & set(reserved)
+    if overlap:
+        raise ValueError(
+            f"Arguments {sorted(overlap)} are derived from the design parameters and cannot be passed directly"
+        )
 
 
 def merge_ci_kwargs(derived_kwargs: Dict[str, Any], user_kwargs: Dict[str, Any]) -> Dict[str, Any]:

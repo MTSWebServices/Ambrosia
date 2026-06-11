@@ -66,6 +66,21 @@ def test_multigroup_skew_detected():
 
 
 @pytest.mark.unit
+def test_alpha_threshold_band():
+    """
+    A split with a p-value between the strict default alpha and 0.05 is NOT
+    flagged by default, but is flagged at a looser alpha: guards the actual
+    detection threshold rather than a hardcoded 0.05.
+    """
+    observed = {"A": 5110, "B": 4890}
+    default_result = check_srm_from_counts(observed)
+    loose_result = check_srm_from_counts(observed, alpha=0.05)
+    assert 0.0005 < default_result["pvalue"] < 0.05
+    assert not default_result["srm_detected"]
+    assert loose_result["srm_detected"]
+
+
+@pytest.mark.unit
 def test_custom_expected_ratios():
     """
     A deliberate 90/10 split passes with matching ratios and fails without them.

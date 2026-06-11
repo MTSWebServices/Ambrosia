@@ -586,7 +586,9 @@ class Tester(ABToolAbstract):
             testing and emit a warning if the observed sizes deviate from
             the expected ratios (chi-square test at the ``0.0005`` level).
             A detected mismatch usually means a broken assignment procedure,
-            making the test results unreliable.
+            making the test results unreliable. The check assumes one row
+            per randomization unit (e.g. one user); for Spark data it
+            triggers a count job per group.
         srm_expected_ratios : Dict[Any, float], optional
             Expected group size ratios for the Sample Ratio Mismatch check,
             mapping group label to its share (normalized internally).

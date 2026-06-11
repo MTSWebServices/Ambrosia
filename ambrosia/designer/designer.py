@@ -29,6 +29,7 @@ in form of both pandas and Spark(with some restrictions) dataframes.
 from __future__ import annotations
 
 from typing import List, Optional
+from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -649,11 +650,18 @@ def design_binary_size(
             stabilizing_method=stabilizing_method,
         )
     elif method == "binary":
+        if groups_ratio != 1.0:
+            warn(
+                "groups_ratio is not supported for the binary method and is ignored: equal group sizes are "
+                "designed (use method='theory' for unequal groups)",
+                stacklevel=2,
+            )
         return bin_pkg.get_table_sample_size_on_effect(
             p_a=prob_a,
             first_errors=first_type_errors,
             second_errors=second_type_errors,
             delta_relative_values=effects,
+            alternative=alternative,
             **kwargs,
         )
     else:
@@ -735,12 +743,19 @@ def design_binary_effect(
             stabilizing_method=stabilizing_method,
         )
     elif method == "binary":
+        if groups_ratio != 1.0:
+            warn(
+                "groups_ratio is not supported for the binary method and is ignored: equal group sizes are "
+                "designed (use method='theory' for unequal groups)",
+                stacklevel=2,
+            )
         return bin_pkg.get_table_effect_on_sample_size(
             p_a=prob_a,
             sample_sizes=sizes,
             first_errors=first_type_errors,
             second_errors=second_type_errors,
             as_numeric=as_numeric,
+            alternative=alternative,
             **kwargs,
         )
     else:
@@ -822,12 +837,19 @@ def design_binary_power(
             stabilizing_method=stabilizing_method,
         )
     elif method == "binary":
+        if groups_ratio != 1.0:
+            warn(
+                "groups_ratio is not supported for the binary method and is ignored: equal group sizes are "
+                "designed (use method='theory' for unequal groups)",
+                stacklevel=2,
+            )
         return bin_pkg.get_table_power_on_size_and_delta(
             p_a=prob_a,
             sample_sizes=sizes,
             first_errors=first_type_errors,
             delta_relative_values=effects,
             as_numeric=as_numeric,
+            alternative=alternative,
             **kwargs,
         )
     else:
